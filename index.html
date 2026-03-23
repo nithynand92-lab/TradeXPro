@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TradeX Pro — Sign In</title>
+<link rel="stylesheet" href="style.css">
+
+<!-- STEP 1: Firebase compat SDKs FIRST (no type="module") -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+
+<!-- STEP 2: Your config (defines TRADEX_FIREBASE_CONFIG, no import/export) -->
+<script src="firebase-config.js"></script>
+</head>
+<body>
+
+<div class="auth-root">
+  <div class="auth-bg-glow"></div>
+
+  <div class="auth-card">
+    <!-- Logo -->
+    <div class="auth-logo">
+      <div class="auth-logo-orb">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8">
+          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+        </svg>
+      </div>
+      <span class="auth-logo-name">TradeX Pro</span>
+    </div>
+
+    <!-- Tabs -->
+    <div class="auth-tabs">
+      <button class="auth-tab on" onclick="switchAuthTab('login')">Sign In</button>
+      <button class="auth-tab"   onclick="switchAuthTab('signup')">Sign Up</button>
+      <button class="auth-tab"   onclick="switchAuthTab('phone')">Phone</button>
+    </div>
+
+    <!-- ── LOGIN PANEL ── -->
+    <div class="auth-panel on" id="panel-login">
+      <div class="auth-title">Welcome back</div>
+      <div class="auth-sub">Sign in to your TradeX Pro account</div>
+
+      <div class="field-group">
+        <label class="field-label">Email</label>
+        <input class="field-inp" id="login-email" type="email" placeholder="you@email.com" autocomplete="email"/>
+      </div>
+      <div class="field-group">
+        <label class="field-label">Password</label>
+        <input class="field-inp" id="login-pass" type="password" placeholder="••••••••" autocomplete="current-password"/>
+      </div>
+
+      <button class="btn-primary" id="btn-login" onclick="doEmailLogin()">Sign In</button>
+      <div class="auth-err" id="login-err"></div>
+
+      <div class="divider-or">or continue with</div>
+
+      <button class="btn-outline" id="btn-google" onclick="doGoogleLogin()">
+        <svg width="18" height="18" viewBox="0 0 48 48">
+          <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+          <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+          <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+          <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.29-8.16 2.29-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+        </svg>
+        Continue with Google
+      </button>
+    </div>
+
+    <!-- ── SIGNUP PANEL ── -->
+    <div class="auth-panel" id="panel-signup">
+      <div class="auth-title">Create account</div>
+      <div class="auth-sub">Join TradeX Pro today</div>
+
+      <div class="field-group">
+        <label class="field-label">Username</label>
+        <input class="field-inp" id="su-username" type="text" placeholder="e.g. Raj_Trader" maxlength="20" autocomplete="off"/>
+      </div>
+      <div class="field-group">
+        <label class="field-label">Email</label>
+        <input class="field-inp" id="su-email" type="email" placeholder="you@email.com" autocomplete="email"/>
+      </div>
+      <div class="field-group">
+        <label class="field-label">Password (min 6 chars)</label>
+        <input class="field-inp" id="su-pass" type="password" placeholder="••••••••" autocomplete="new-password"/>
+      </div>
+
+      <button class="btn-primary" id="btn-signup" onclick="doSignup()">Create Account</button>
+      <div class="auth-err" id="su-err"></div>
+      <div class="auth-ok"  id="su-ok"></div>
+    </div>
+
+    <!-- ── PHONE PANEL ── -->
+    <div class="auth-panel" id="panel-phone">
+      <div class="auth-title">Phone sign in</div>
+      <div class="auth-sub">We'll send a 6-digit code via SMS</div>
+
+      <div id="phone-step-1">
+        <div class="field-group">
+          <label class="field-label">Phone number</label>
+          <div class="phone-row">
+            <input class="phone-code" id="ph-code" type="tel" value="+91" maxlength="5"/>
+            <input class="field-inp flex1" id="ph-number" type="tel" placeholder="98765 43210" maxlength="15"/>
+          </div>
+        </div>
+        <div id="recaptcha-container"></div>
+        <button class="btn-primary" id="btn-send-otp" onclick="doSendOTP()" style="margin-top:12px;">Send OTP</button>
+        <div class="auth-err" id="ph-err"></div>
+      </div>
+
+      <div id="phone-step-2" style="display:none;">
+        <div class="auth-ok" id="ph-sent-msg">Code sent! Enter it below.</div>
+        <div class="field-group" style="margin-top:12px;">
+          <label class="field-label">Enter 6-digit OTP</label>
+          <div class="otp-row">
+            <input class="otp-inp" maxlength="1" oninput="otpNav(this,0)"/>
+            <input class="otp-inp" maxlength="1" oninput="otpNav(this,1)"/>
+            <input class="otp-inp" maxlength="1" oninput="otpNav(this,2)"/>
+            <input class="otp-inp" maxlength="1" oninput="otpNav(this,3)"/>
+            <input class="otp-inp" maxlength="1" oninput="otpNav(this,4)"/>
+            <input class="otp-inp" maxlength="1" oninput="otpNav(this,5)"/>
+          </div>
+        </div>
+        <button class="btn-primary" id="btn-verify-otp" onclick="doVerifyOTP()">Verify & Sign In</button>
+        <div class="auth-err" id="otp-err"></div>
+        <button class="btn-outline" onclick="resetPhone()" style="margin-top:8px;font-size:12px;padding:8px;">← Change number</button>
+      </div>
+    </div>
+
+  </div><!-- /.auth-card -->
+</div><!-- /.auth-root -->
+
+<!-- STEP 3: Main app script — runs AFTER Firebase SDKs + config are loaded -->
+<script>
+/* ══════════════════════════════════════════════
+   TRADEX PRO — Auth Logic
+   Uses Firebase compat (v9.23.0) — NO import/export
+══════════════════════════════════════════════ */
+
+// Guard: prevent "app already initialized" if script is loaded twice
+var auth;
+if (!firebase.apps.length) {
+  firebase.initializeApp(TRADEX_FIREBASE_CONFIG);
+}
+auth = firebase.auth();
+
+// ── Tab switching ──
+function switchAuthTab(tab) {
+  var tabs   = ['login', 'signup', 'phone'];
+  var tabBtns = document.querySelectorAll('.auth-tab');
+  tabBtns.forEach(function(t, i) {
+    t.classList.toggle('on', tabs[i] === tab);
+  });
+  document.querySelectorAll('.auth-panel').forEach(function(p) {
+    p.classList.remove('on');
+  });
+  document.getElementById('panel-' + tab).classList.add('on');
+}
+
+// ── Helpers ──
+function setErr(id, msg) { document.getElementById(id).textContent = msg; }
+function setOk(id, msg)  { document.getElementById(id).textContent = msg; }
+function setBtn(id, loading) {
+  var b = document.getElementById(id);
+  b.disabled = loading;
+  b.style.opacity = loading ? '.6' : '1';
+}
+
+// ── Redirect if already logged in ──
+auth.onAuthStateChanged(function(user) {
+  if (user) window.location.href = 'dashboard.html';
+});
+
+/* ── Email / Password Login ── */
+function doEmailLogin() {
+  var email = document.getElementById('login-email').value.trim();
+  var pass  = document.getElementById('login-pass').value;
+  setErr('login-err', '');
+  if (!email || !pass) { setErr('login-err', 'Please fill all fields.'); return; }
+  setBtn('btn-login', true);
+
+  auth.signInWithEmailAndPassword(email, pass)
+    .then(function() {
+      window.location.href = 'dashboard.html';
+    })
+    .catch(function(e) {
+      var msg = e.code === 'auth/user-not-found'  ? 'No account with this email.'
+              : e.code === 'auth/wrong-password'   ? 'Incorrect password.'
+              : e.code === 'auth/invalid-email'    ? 'Invalid email format.'
+              : e.code === 'auth/invalid-credential' ? 'Invalid email or password.'
+              : e.message;
+      setErr('login-err', msg);
+      setBtn('btn-login', false);
+    });
+}
+
+/* ── Google Login ── */
+function doGoogleLogin() {
+  var provider = new firebase.auth.GoogleAuthProvider();
+  setBtn('btn-google', true);
+
+  auth.signInWithPopup(provider)
+    .then(function() {
+      window.location.href = 'dashboard.html';
+    })
+    .catch(function(e) {
+      // If popup was blocked, fall back to redirect
+      if (e.code === 'auth/popup-blocked') {
+        auth.signInWithRedirect(provider);
+        return;
+      }
+      setErr('login-err', e.message);
+      setBtn('btn-google', false);
+    });
+}
+
+/* ── Sign Up ── */
+function doSignup() {
+  var username = document.getElementById('su-username').value.trim();
+  var email    = document.getElementById('su-email').value.trim();
+  var pass     = document.getElementById('su-pass').value;
+  setErr('su-err', ''); setOk('su-ok', '');
+  if (!username || !email || !pass) { setErr('su-err', 'Please fill all fields.'); return; }
+  if (username.length < 2)          { setErr('su-err', 'Username must be at least 2 characters.'); return; }
+  if (pass.length < 6)              { setErr('su-err', 'Password must be at least 6 characters.'); return; }
+  setBtn('btn-signup', true);
+
+  auth.createUserWithEmailAndPassword(email, pass)
+    .then(function(cred) {
+      return cred.user.updateProfile({ displayName: username });
+    })
+    .then(function() {
+      setOk('su-ok', '✓ Account created! Redirecting…');
+      setTimeout(function() { window.location.href = 'dashboard.html'; }, 1200);
+    })
+    .catch(function(e) {
+      var msg = e.code === 'auth/email-already-in-use' ? 'This email is already registered.'
+              : e.code === 'auth/invalid-email'        ? 'Invalid email format.'
+              : e.message;
+      setErr('su-err', msg);
+      setBtn('btn-signup', false);
+    });
+}
+
+/* ── Phone / OTP ── */
+var confirmationResult = null;
+
+function doSendOTP() {
+  var code = document.getElementById('ph-code').value.trim();
+  var num  = document.getElementById('ph-number').value.trim().replace(/\s/g, '');
+  var full = code + num;
+  setErr('ph-err', '');
+  if (!num || num.length < 7) { setErr('ph-err', 'Enter a valid phone number.'); return; }
+  setBtn('btn-send-otp', true);
+
+  if (!window.recaptchaVerifier) {
+    window.recaptchaVerifier = new firebase.auth.RecaptchaVerifier('recaptcha-container', {
+      size: 'normal',
+      callback: function() {},
+      'expired-callback': function() {
+        window.recaptchaVerifier.clear();
+        window.recaptchaVerifier = null;
+      }
+    });
+  }
+
+  auth.signInWithPhoneNumber(full, window.recaptchaVerifier)
+    .then(function(result) {
+      confirmationResult = result;
+      document.getElementById('phone-step-1').style.display = 'none';
+      document.getElementById('phone-step-2').style.display = 'block';
+    })
+    .catch(function(e) {
+      setErr('ph-err', e.message);
+      setBtn('btn-send-otp', false);
+    });
+}
+
+function otpNav(el, idx) {
+  var inputs = document.querySelectorAll('.otp-inp');
+  el.value = el.value.replace(/\D/, '');
+  if (el.value && idx < 5) inputs[idx + 1].focus();
+}
+
+function getOTPCode() {
+  return Array.from(document.querySelectorAll('.otp-inp'))
+    .map(function(i) { return i.value; }).join('');
+}
+
+function doVerifyOTP() {
+  var code = getOTPCode();
+  setErr('otp-err', '');
+  if (code.length !== 6) { setErr('otp-err', 'Enter the complete 6-digit code.'); return; }
+  if (!confirmationResult) { setErr('otp-err', 'Session expired. Try again.'); resetPhone(); return; }
+  setBtn('btn-verify-otp', true);
+
+  confirmationResult.confirm(code)
+    .then(function() { window.location.href = 'dashboard.html'; })
+    .catch(function() {
+      setErr('otp-err', 'Invalid code. Please try again.');
+      setBtn('btn-verify-otp', false);
+    });
+}
+
+function resetPhone() {
+  document.getElementById('phone-step-1').style.display = 'block';
+  document.getElementById('phone-step-2').style.display = 'none';
+  document.querySelectorAll('.otp-inp').forEach(function(i) { i.value = ''; });
+  setErr('ph-err', ''); setErr('otp-err', '');
+  setBtn('btn-send-otp', false);
+  confirmationResult = null;
+  if (window.recaptchaVerifier) {
+    try { window.recaptchaVerifier.clear(); } catch(e) {}
+    window.recaptchaVerifier = null;
+  }
+}
+
+/* ── Enter key support ── */
+document.addEventListener('keydown', function(e) {
+  if (e.key !== 'Enter') return;
+  var active = document.querySelector('.auth-panel.on');
+  if (!active) return;
+  if (active.id === 'panel-login')  doEmailLogin();
+  if (active.id === 'panel-signup') doSignup();
+});
+</script>
+
+</body>
+</html>

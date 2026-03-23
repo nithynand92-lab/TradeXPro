@@ -1,0 +1,1175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+<title>TradeX AI — Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@400;600;700;800;900&display=swap" rel="stylesheet"/>
+<!-- Firebase 8 for Chat + Top Traders -->
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<!-- LightweightCharts for Strategy Engine -->
+<script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+<!-- TradingView for Simulator -->
+<script src="https://s3.tradingview.com/tv.js"></script>
+
+<style>
+/* ═══════════════════════════════════════════════════════
+   GLOBAL TOKENS
+═══════════════════════════════════════════════════════ */
+:root {
+  --bg0:#05060d; --bg1:#080a14; --bg2:#0c0f1e; --bg3:#101328; --bg4:#141730;
+  --surface:#181c38;
+  --border:rgba(255,255,255,0.06); --border-hi:rgba(100,130,255,0.35);
+  --blue:#4f72ff; --blue2:#6b8fff; --indigo:#7c5cfc;
+  --teal:#00d4a8; --green:#00c87a; --rose:#ff4d6d; --amber:#f5b731;
+  --gold:#f0b429; --silver:#94a3b8; --bronze:#b87333;
+  --t1:#eef0ff; --t2:rgba(238,240,255,0.65); --t3:rgba(238,240,255,0.38); --t4:rgba(238,240,255,0.18);
+  --f-head:'Syne',sans-serif; --f-body:'DM Sans',sans-serif; --f-mono:'JetBrains Mono',monospace; --f-display:'Outfit',sans-serif;
+  --r:14px; --r-lg:20px; --r-xl:26px;
+  --glow-blue:0 0 40px rgba(79,114,255,0.18);
+  --nav-h:62px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg0);color:var(--t1);font-family:var(--f-body);-webkit-font-smoothing:antialiased;min-height:100vh;overflow-x:hidden;padding-bottom:var(--nav-h)}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;background:radial-gradient(ellipse 70% 50% at 10% -10%,rgba(79,114,255,0.09) 0%,transparent 60%),radial-gradient(ellipse 50% 40% at 90% 100%,rgba(124,92,252,0.07) 0%,transparent 55%)}
+body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;background-image:linear-gradient(rgba(79,114,255,0.022) 1px,transparent 1px),linear-gradient(90deg,rgba(79,114,255,0.022) 1px,transparent 1px);background-size:52px 52px}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(79,114,255,0.25);border-radius:4px}
+*{scrollbar-width:thin;scrollbar-color:rgba(79,114,255,0.2) transparent}
+
+/* ═══════════════════════════════════════════════════════
+   SPA SYSTEM
+═══════════════════════════════════════════════════════ */
+.page{display:none;position:relative;z-index:1;min-height:calc(100vh - var(--nav-h));animation:pgIn .28s ease both}
+.page.active{display:block}
+#pageChat.active{display:flex;flex-direction:column;height:calc(100vh - var(--nav-h))}
+@keyframes pgIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+/* ═══════════════════════════════════════════════════════
+   BOTTOM NAV
+═══════════════════════════════════════════════════════ */
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;height:var(--nav-h);background:rgba(5,6,13,0.96);backdrop-filter:blur(24px);border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-around;padding:0 4px 6px;z-index:500}
+.nav-btn{display:flex;flex-direction:column;align-items:center;gap:3px;flex:1;padding:8px 0 0;background:none;border:none;cursor:pointer;color:var(--t4);font-family:var(--f-body);transition:color .2s;position:relative}
+.nav-btn svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:1.8;transition:all .2s}
+.nav-btn span{font-size:9px;font-weight:500;letter-spacing:.2px}
+.nav-btn.active{color:var(--blue2)}
+.nav-btn.active svg{stroke:var(--blue);filter:drop-shadow(0 0 6px rgba(79,114,255,0.55))}
+.nav-btn::after{content:'';position:absolute;bottom:-6px;left:50%;transform:translateX(-50%);width:0;height:2px;background:var(--blue);border-radius:2px;transition:width .2s}
+.nav-btn.active::after{width:22px}
+
+/* ═══════════════════════════════════════════════════════
+   SHARED COMPONENTS
+═══════════════════════════════════════════════════════ */
+.pg-header{display:flex;align-items:center;justify-content:space-between;padding:18px 18px 14px;flex-wrap:wrap;gap:10px}
+.pg-logo-row{display:flex;align-items:center;gap:11px}
+.pg-logo{width:36px;height:36px;border-radius:11px;background:linear-gradient(135deg,var(--blue),var(--indigo));display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(79,114,255,0.35)}
+.pg-title{font-family:var(--f-head);font-size:19px;font-weight:800;letter-spacing:-.4px;color:var(--t1)}
+.pg-sub{font-size:10px;color:var(--t3);margin-top:1px}
+.live-badge{display:flex;align-items:center;gap:5px;background:rgba(0,200,122,0.09);border:1px solid rgba(0,200,122,0.22);border-radius:18px;padding:4px 10px;font-family:var(--f-mono);font-size:9px;font-weight:500;color:var(--green)}
+.live-dot{width:5px;height:5px;border-radius:50%;background:var(--green);animation:blink 1.6s infinite}
+@keyframes blink{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(0,200,122,.5)}50%{opacity:.5;box-shadow:0 0 0 4px rgba(0,200,122,0)}}
+.sec-row{display:flex;align-items:center;gap:10px;padding:0 18px;margin-bottom:12px}
+.sec-line{height:1px;flex:1;background:var(--border)}
+.sec-txt{font-family:var(--f-mono);font-size:8.5px;font-weight:500;letter-spacing:1.5px;text-transform:uppercase;color:var(--t4);white-space:nowrap}
+
+/* ═══════════════════════════════════════════════════════
+   PAGE: HOME / WATCHLIST
+═══════════════════════════════════════════════════════ */
+.home-hero{padding:18px 18px 20px;background:linear-gradient(180deg,rgba(79,114,255,0.06),transparent);border-bottom:1px solid var(--border);margin-bottom:16px}
+.home-greet{font-size:12px;color:var(--t3);margin-bottom:3px}
+.home-tag{font-family:var(--f-head);font-size:24px;font-weight:800;letter-spacing:-.5px;color:var(--t1);line-height:1.2}
+.home-tag .acc{color:var(--blue2)}
+.qs-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;padding:0 18px;margin-bottom:20px}
+.qs-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:12px 10px;text-align:center;position:relative;overflow:hidden}
+.qs-card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(79,114,255,0.3),transparent)}
+.qs-val{font-family:var(--f-mono);font-size:14px;font-weight:700;color:var(--t1)}
+.qs-val.g{color:var(--green)}.qs-val.r{color:var(--rose)}
+.qs-lbl{font-size:8.5px;color:var(--t4);margin-top:2px;text-transform:uppercase;letter-spacing:.4px}
+.wl-item{display:flex;align-items:center;gap:11px;padding:13px 18px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .15s}
+.wl-item:hover{background:rgba(255,255,255,0.02)}
+.wl-ico{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.wl-name{font-family:var(--f-head);font-size:13px;font-weight:700;color:var(--t1)}
+.wl-tick{font-family:var(--f-mono);font-size:8px;color:var(--t4);margin-top:1px}
+.wl-price{font-family:var(--f-mono);font-size:14px;font-weight:600;color:var(--t1)}
+.wl-chg{font-family:var(--f-mono);font-size:10px;font-weight:600;margin-top:2px;padding:2px 5px;border-radius:4px}
+.wl-chg.up{background:rgba(0,200,122,0.1);color:var(--green)}.wl-chg.dn{background:rgba(255,77,109,0.1);color:var(--rose)}
+
+/* ═══════════════════════════════════════════════════════
+   PAGE: EXPLORE
+═══════════════════════════════════════════════════════ */
+.exp-shell{max-width:1280px;margin:0 auto;padding:0 18px 80px}
+/* scanner */
+.scanner-wrap{margin-bottom:32px}
+.scanner-card{background:var(--bg2);border:1px solid var(--border-hi);border-radius:var(--r-xl);padding:22px;box-shadow:var(--glow-blue);position:relative;overflow:hidden}
+.scanner-card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(79,114,255,0.5),transparent)}
+.sc-header{display:flex;align-items:center;gap:13px;margin-bottom:18px}
+.sc-icon{width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,rgba(79,114,255,0.2),rgba(124,92,252,0.15));border:1px solid rgba(79,114,255,0.25);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.sc-title{font-family:var(--f-head);font-size:16px;font-weight:800;color:var(--t1)}
+.sc-sub{font-size:11px;color:var(--t3);margin-top:2px}
+.sc-input-row{display:flex;gap:9px;margin-bottom:14px}
+.sc-input{flex:1;background:var(--bg1);border:1px solid var(--border);border-radius:11px;padding:11px 14px;color:var(--t1);font-size:13px;font-family:var(--f-body);outline:none;caret-color:var(--blue);transition:all .2s}
+.sc-input:focus{border-color:var(--border-hi);background:rgba(79,114,255,0.04);box-shadow:0 0 0 3px rgba(79,114,255,0.1)}
+.sc-input::placeholder{color:var(--t4)}
+.sc-btn{padding:11px 18px;border-radius:11px;background:linear-gradient(135deg,var(--blue),var(--indigo));border:none;color:#fff;font-family:var(--f-head);font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;box-shadow:0 4px 16px rgba(79,114,255,0.35);transition:all .2s}
+.sc-btn:hover{transform:translateY(-1px);box-shadow:0 6px 22px rgba(79,114,255,0.48)}
+.sc-presets{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:16px}
+.preset-chip{padding:4px 10px;border-radius:7px;border:1px solid var(--border);background:var(--bg3);color:var(--t3);font-family:var(--f-mono);font-size:9px;cursor:pointer;transition:all .18s}
+.preset-chip:hover{border-color:rgba(79,114,255,0.4);color:var(--blue2);background:rgba(79,114,255,0.06)}
+.sc-result{display:none}.sc-result.show{display:block;animation:fadeUp .3s ease}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.res-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:11px}
+@media(max-width:600px){.res-grid{grid-template-columns:1fr}}
+.res-card{background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:15px;text-align:center}
+.res-lbl{font-family:var(--f-mono);font-size:8.5px;text-transform:uppercase;letter-spacing:.9px;color:var(--t4);margin-bottom:8px}
+.res-val{font-family:var(--f-head);font-size:19px;font-weight:800}
+.res-val.bullish{color:var(--green)}.res-val.bearish{color:var(--rose)}.res-val.neutral{color:var(--amber)}
+.conf-bar{height:5px;background:var(--bg1);border-radius:3px;margin-top:7px;overflow:hidden}
+.conf-fill{height:100%;border-radius:3px;transition:width .6s cubic-bezier(.23,1,.32,1)}
+.conf-fill.high{background:linear-gradient(90deg,var(--green),var(--teal))}.conf-fill.mid{background:linear-gradient(90deg,var(--amber),#fb923c)}.conf-fill.low{background:linear-gradient(90deg,var(--rose),#f472b6)}
+.sc-sym-row{display:inline-flex;align-items:center;gap:7px;margin-bottom:14px;background:rgba(79,114,255,0.08);border:1px solid rgba(79,114,255,0.2);border-radius:8px;padding:6px 12px}
+.sc-sym-txt{font-family:var(--f-mono);font-size:12px;font-weight:500;color:var(--blue2)}
+.lvl-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:11px;margin-top:12px}
+.lvl-card{background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:13px;text-align:center}
+.lvl-lbl{font-family:var(--f-mono);font-size:8.5px;text-transform:uppercase;letter-spacing:.9px;color:var(--t4);margin-bottom:6px}
+.lvl-val{font-family:var(--f-mono);font-size:13px;font-weight:600;color:var(--t1)}
+.lvl-val.sl{color:var(--rose)}.lvl-val.tp{color:var(--green)}
+.disc-row{margin-top:9px;font-size:9px;color:rgba(245,183,49,0.7);text-align:center;display:none}
+/* market cards */
+.mk-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:11px}
+@media(max-width:880px){.mk-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:540px){.mk-grid{grid-template-columns:1fr}}
+.mk-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r-lg);padding:16px;position:relative;overflow:hidden;transition:border-color .2s,box-shadow .2s}
+.mk-card:hover{border-color:rgba(79,114,255,0.3);box-shadow:var(--glow-blue)}
+.mk-card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(79,114,255,0.25),transparent)}
+.mk-asset{display:flex;align-items:center;gap:9px;margin-bottom:11px}
+.mk-ico{width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.mk-name{font-family:var(--f-head);font-size:13px;font-weight:700;color:var(--t1)}
+.mk-ticker{font-family:var(--f-mono);font-size:8px;color:var(--t4);margin-top:1px}
+.mk-price{font-family:var(--f-mono);font-size:20px;font-weight:500;color:var(--t1);margin-bottom:5px}
+.mk-chg{display:inline-flex;align-items:center;gap:3px;border-radius:5px;padding:2px 6px;font-family:var(--f-mono);font-size:10px;font-weight:500}
+.mk-chg.up{background:rgba(0,200,122,0.1);color:var(--green)}.mk-chg.down{background:rgba(255,77,109,0.1);color:var(--rose)}.mk-chg.flat{background:rgba(245,183,49,0.1);color:var(--amber)}
+.mk-spark{margin-top:10px;height:34px;opacity:.8}
+.trend-badge{display:inline-flex;align-items:center;gap:4px;margin-top:6px;border-radius:5px;padding:2px 7px;font-family:var(--f-mono);font-size:8px;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+.trend-badge.bullish{background:rgba(0,200,122,0.1);color:var(--green);border:1px solid rgba(0,200,122,0.2)}
+.trend-badge.bearish{background:rgba(255,77,109,0.1);color:var(--rose);border:1px solid rgba(255,77,109,0.2)}
+.trend-badge.neutral{background:rgba(245,183,49,0.1);color:var(--amber);border:1px solid rgba(245,183,49,0.2)}
+.conf-micro{font-family:var(--f-mono);font-size:8px;color:var(--t4);margin-left:4px}
+.card-lvls{display:flex;gap:5px;flex-wrap:wrap;margin-top:7px}
+.card-lvl-chip{font-family:var(--f-mono);font-size:8px;border-radius:4px;padding:2px 6px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);color:var(--t4);white-space:nowrap}
+.card-lvl-chip strong{font-weight:600;margin-left:2px}
+.card-lvl-chip.sl strong{color:var(--rose)}.card-lvl-chip.tp strong{color:var(--green)}
+.card-disc{font-size:8px;color:rgba(245,183,49,0.55);margin-top:5px}
+/* ideas */
+.idea-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+@media(max-width:880px){.idea-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:540px){.idea-grid{grid-template-columns:1fr}}
+.idea-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r-lg);padding:16px;position:relative;overflow:hidden;transition:border-color .2s,transform .2s}
+.idea-card:hover{border-color:rgba(79,114,255,0.3);transform:translateY(-2px)}
+.idea-card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(79,114,255,0.25),transparent)}
+.idea-hdr{display:flex;align-items:flex-start;gap:7px;margin-bottom:8px}
+.idea-tag{font-family:var(--f-mono);font-size:8.5px;text-transform:uppercase;letter-spacing:.7px;border-radius:5px;padding:2px 6px;flex-shrink:0}
+.idea-tag.bull{background:rgba(0,200,122,0.1);color:var(--green);border:1px solid rgba(0,200,122,0.2)}
+.idea-tag.bear{background:rgba(255,77,109,0.1);color:var(--rose);border:1px solid rgba(255,77,109,0.2)}
+.idea-tag.neutral{background:rgba(245,183,49,0.1);color:var(--amber);border:1px solid rgba(245,183,49,0.2)}
+.idea-title{font-family:var(--f-head);font-size:12px;font-weight:700;color:var(--t1);line-height:1.35;margin-bottom:6px}
+.idea-desc{font-size:10.5px;color:var(--t3);line-height:1.6;margin-bottom:9px}
+.idea-meta{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.idea-sym{font-family:var(--f-mono);font-size:9px;color:var(--blue2);background:rgba(79,114,255,0.08);border:1px solid rgba(79,114,255,0.15);border-radius:4px;padding:2px 6px}
+.idea-time{font-size:9px;color:var(--t4)}
+.idea-conf{font-size:9px;color:var(--t3);margin-left:auto}
+/* strategy */
+.strat-trigger-btn{display:flex;align-items:center;gap:10px;padding:13px 22px;border-radius:13px;background:linear-gradient(135deg,var(--blue),var(--indigo));border:none;color:#fff;cursor:pointer;font-family:var(--f-head);font-size:13px;font-weight:700;box-shadow:0 6px 26px rgba(79,114,255,0.38);transition:all .22s}
+.strat-trigger-btn:hover{transform:translateY(-2px)}
+/* strategy modal */
+.modal-bg{position:fixed;inset:0;background:rgba(5,6,13,0.9);backdrop-filter:blur(14px);z-index:2000;display:none;align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto}
+.modal-bg.open{display:flex;animation:fdIn .22s ease}
+@keyframes fdIn{from{opacity:0}to{opacity:1}}
+.strat-modal{background:var(--bg2);border:1px solid var(--border-hi);border-radius:var(--r-xl);width:100%;max-width:940px;margin:auto;position:relative;overflow:hidden;animation:slUp .3s cubic-bezier(.23,1,.32,1)}
+.strat-modal::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(79,114,255,0.6),transparent)}
+@keyframes slUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
+.modal-hdr{display:flex;align-items:center;justify-content:space-between;padding:20px 24px 16px;border-bottom:1px solid var(--border)}
+.modal-ttl-row{display:flex;align-items:center;gap:10px}
+.modal-ico{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,rgba(79,114,255,0.2),rgba(124,92,252,0.15));border:1px solid rgba(79,114,255,0.25);display:flex;align-items:center;justify-content:center}
+.modal-ttl{font-family:var(--f-head);font-size:16px;font-weight:800;color:var(--t1)}
+.modal-sub{font-size:10px;color:var(--t3);margin-top:1px}
+.modal-cls{width:32px;height:32px;border-radius:8px;background:var(--bg3);border:1px solid var(--border);color:var(--t3);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .18s}
+.modal-cls:hover{background:var(--surface);color:var(--t1)}
+.modal-body{display:flex;height:520px}
+@media(max-width:720px){.modal-body{flex-direction:column;height:auto}}
+.strat-list-panel{width:240px;flex-shrink:0;border-right:1px solid var(--border);overflow-y:auto;padding:11px}
+@media(max-width:720px){.strat-list-panel{width:100%;height:170px;border-right:none;border-bottom:1px solid var(--border)}}
+.strat-grp-lbl{font-family:var(--f-mono);font-size:7.5px;text-transform:uppercase;letter-spacing:1.2px;color:var(--t4);padding:7px 7px 3px}
+.strat-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;cursor:pointer;transition:all .16s;margin-bottom:1px}
+.strat-item:hover{background:rgba(79,114,255,0.08)}.strat-item.active{background:rgba(79,114,255,0.14);border:1px solid rgba(79,114,255,0.25)}
+.strat-item-ico{width:24px;height:24px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;background:var(--bg3)}
+.strat-item-name{font-size:11.5px;font-weight:500;color:var(--t2)}.strat-item.active .strat-item-name{color:var(--blue2)}
+.strat-chart-panel{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.chart-info-bar{padding:15px 20px 12px;border-bottom:1px solid var(--border)}
+.chart-strat-name{font-family:var(--f-head);font-size:15px;font-weight:800;color:var(--t1)}
+.chart-strat-desc{font-size:10.5px;color:var(--t3);margin-top:2px;line-height:1.5}
+.chart-tags{display:flex;gap:4px;margin-top:6px;flex-wrap:wrap}
+.chart-tag{font-family:var(--f-mono);font-size:8px;border-radius:4px;padding:2px 5px;background:rgba(79,114,255,0.1);border:1px solid rgba(79,114,255,0.2);color:var(--blue2)}
+.chart-container{flex:1;position:relative;min-height:260px}
+#strategyChart{width:100%;height:100%}
+
+/* ═══════════════════════════════════════════════════════
+   PAGE: CHART / SIMULATOR
+═══════════════════════════════════════════════════════ */
+#pageChart{padding:0;height:calc(100vh - var(--nav-h));min-height:auto}
+.sim-shell{display:grid;grid-template-rows:46px 1fr;grid-template-columns:1fr 290px;height:100%}
+@media(max-width:780px){.sim-shell{grid-template-columns:1fr;grid-template-rows:46px 54vh auto}}
+.sim-topbar{grid-column:1/-1;display:flex;align-items:center;gap:9px;padding:0 12px;background:var(--bg2);border-bottom:1px solid var(--border);z-index:10;overflow-x:auto}
+.sim-logo{font-family:var(--f-head);font-size:14px;font-weight:800;color:var(--t1);margin-right:5px;white-space:nowrap}
+.sim-logo span{color:var(--gold)}
+.sym-wrap{display:flex;align-items:center;background:var(--bg3);border:1px solid var(--border);border-radius:6px;overflow:hidden;flex-shrink:0}
+.sym-btn{padding:5px 9px;font-family:var(--f-mono);font-size:9.5px;font-weight:700;color:var(--t4);background:none;border:none;cursor:pointer;white-space:nowrap;transition:all .15s;border-right:1px solid var(--border)}
+.sym-btn:last-child{border-right:none}
+.sym-btn:hover{background:rgba(255,255,255,0.04);color:var(--t1)}
+.sym-btn.active{background:var(--blue);color:#fff}
+.lp-bar{margin-left:auto;display:flex;align-items:center;gap:6px;flex-shrink:0}
+.lp-sym{font-size:9.5px;font-weight:700;color:var(--t4);letter-spacing:.4px}
+.lp-val{font-size:13px;font-weight:700;color:var(--t1);font-family:var(--f-mono)}
+.lp-chg{font-size:10px;font-weight:700}.lp-chg.up{color:var(--green)}.lp-chg.dn{color:var(--rose)}
+.sim-dot{width:5px;height:5px;border-radius:50%;background:var(--green);box-shadow:0 0 5px var(--green);animation:blink 1.8s infinite}
+.sim-chart-area{position:relative;background:var(--bg0);overflow:hidden}
+#tv-widget{width:100%;height:100%}
+.sim-side{display:flex;flex-direction:column;background:var(--bg2);border-left:1px solid var(--border);overflow-y:auto}
+.sim-sec-hd{padding:9px 12px 7px;font-size:8px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t4);border-bottom:1px solid var(--border)}
+.inst-blk{padding:10px 12px;border-bottom:1px solid var(--border)}
+.inst-name{font-family:var(--f-head);font-size:18px;font-weight:800;color:var(--t1);letter-spacing:-.4px;margin-bottom:1px}
+.inst-full{font-size:8.5px;color:var(--t4);margin-bottom:8px}
+.p-row{display:flex;align-items:baseline;gap:6px;margin-bottom:4px}
+.p-big{font-size:22px;font-weight:700;color:var(--t1);font-family:var(--f-mono)}
+.p-chg{font-size:9.5px;font-weight:700;padding:1px 6px;border-radius:4px}
+.p-chg.up{background:rgba(0,200,122,0.12);color:var(--green)}.p-chg.dn{background:rgba(255,77,109,0.12);color:var(--rose)}
+.ohlc{display:grid;grid-template-columns:1fr 1fr;gap:2px 6px}
+.ohlc-item{display:flex;justify-content:space-between}
+.ohlc-lbl{font-size:8px;color:var(--t4)}.ohlc-val{font-size:10px;font-weight:600;color:var(--t3)}
+.trade-blk{padding:10px 12px;border-bottom:1px solid var(--border);flex-shrink:0}
+.trade-type-row{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:8px}
+.tt-btn{height:32px;border-radius:6px;border:1px solid var(--border);font-family:var(--f-mono);font-size:10.5px;font-weight:700;cursor:pointer;transition:all .15s}
+.tt-btn.buy{background:rgba(0,200,122,0.07);color:rgba(0,200,122,0.5);border-color:rgba(0,200,122,0.12)}.tt-btn.buy.active,.tt-btn.buy:hover{background:var(--green);color:#000;border-color:var(--green)}
+.tt-btn.sell{background:rgba(255,77,109,0.07);color:rgba(255,77,109,0.5);border-color:rgba(255,77,109,0.12)}.tt-btn.sell.active,.tt-btn.sell:hover{background:var(--rose);color:#fff;border-color:var(--rose)}
+.fld-lbl{font-size:8px;color:var(--t4);letter-spacing:.6px;text-transform:uppercase;margin-bottom:2px}
+.fld-row{margin-bottom:6px}
+.sim-inp{width:100%;height:30px;background:var(--bg3);border:1px solid var(--border);border-radius:5px;color:var(--t1);font-family:var(--f-mono);font-size:11px;font-weight:600;padding:0 8px;outline:none;transition:border-color .15s}
+.sim-inp:focus{border-color:rgba(79,114,255,0.4)}
+.sl-tp{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:8px}
+.exec-btn{width:100%;height:36px;border-radius:6px;border:none;font-family:var(--f-mono);font-size:11px;font-weight:700;cursor:pointer;transition:opacity .15s,transform .1s}
+.exec-btn:active{opacity:.85;transform:scale(.98)}
+.exec-btn.buy-e{background:linear-gradient(135deg,var(--green),#009638);color:#000}
+.exec-btn.sell-e{background:linear-gradient(135deg,var(--rose),#c4001a);color:#fff}
+.pos-blk{padding:8px 12px;flex:1}
+.no-pos{text-align:center;padding:16px 0;font-size:9.5px;color:var(--t4)}
+.pos-card{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:8px 9px;margin-bottom:5px;position:relative;overflow:hidden}
+.pos-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:2px}
+.pos-card.buy-p::before{background:var(--green)}.pos-card.sell-p::before{background:var(--rose)}
+.pos-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:3px}
+.pos-sym{font-size:10.5px;font-weight:700;color:var(--t1)}
+.pos-dir{font-size:7.5px;font-weight:700;padding:1px 5px;border-radius:3px}
+.pos-dir.buy-d{background:rgba(0,200,122,0.12);color:var(--green)}.pos-dir.sell-d{background:rgba(255,77,109,0.12);color:var(--rose)}
+.pos-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:2px}
+.pos-item{display:flex;flex-direction:column;gap:1px}
+.pos-lbl{font-size:7px;color:var(--t4)}.pos-val{font-size:9.5px;font-weight:600;color:var(--t3)}
+.pos-pnl{font-size:11.5px;font-weight:700}
+.pos-pnl.profit{color:var(--green)}.pos-pnl.loss{color:var(--rose)}
+.cls-btn{margin-top:6px;width:100%;height:24px;border-radius:4px;border:1px solid var(--border);background:transparent;color:var(--t4);font-family:var(--f-mono);font-size:8.5px;font-weight:700;cursor:pointer;transition:all .15s}
+.cls-btn:hover{background:rgba(255,255,255,0.05);color:var(--t1)}
+.acc-blk{padding:8px 12px 12px;border-top:1px solid var(--border);flex-shrink:0}
+.acc-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+.acc-item{background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:6px 8px}
+.acc-lbl{font-size:7px;color:var(--t4);text-transform:uppercase;letter-spacing:.4px;margin-bottom:1px}
+.acc-val{font-size:11.5px;font-weight:700;color:var(--t1);font-family:var(--f-mono)}
+.acc-val.profit{color:var(--green)}.acc-val.loss{color:var(--rose)}
+.toast-stack{position:fixed;bottom:74px;right:14px;display:flex;flex-direction:column;gap:4px;z-index:999;pointer-events:none}
+.toast-item{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:7px 12px;font-size:10px;font-weight:600;color:var(--t1);box-shadow:0 4px 18px rgba(0,0,0,.5);animation:slIn .2s ease,fdOut .3s ease 2.2s both;white-space:nowrap;display:flex;align-items:center;gap:5px}
+.toast-item.t-buy{border-color:rgba(0,200,122,0.3)}.toast-item.t-sell{border-color:rgba(255,77,109,0.3)}.toast-item.t-cls{border-color:rgba(245,183,49,0.3)}
+@keyframes slIn{from{opacity:0;transform:translateX(18px)}to{opacity:1;transform:translateX(0)}}
+@keyframes fdOut{from{opacity:1}to{opacity:0}}
+
+/* ═══════════════════════════════════════════════════════
+   PAGE: COMMUNITY
+═══════════════════════════════════════════════════════ */
+.comm-tabs{display:flex;gap:6px;padding:10px 18px;overflow-x:auto;scrollbar-width:none;border-bottom:1px solid var(--border);margin-bottom:14px}
+.comm-tabs::-webkit-scrollbar{display:none}
+.comm-tab{flex-shrink:0;padding:6px 14px;border-radius:18px;font-size:11px;font-weight:600;cursor:pointer;border:1px solid var(--border);color:var(--t3);background:transparent;font-family:var(--f-body);white-space:nowrap;transition:all .16s}
+.comm-tab:hover{color:var(--t2);border-color:rgba(255,255,255,0.11)}
+.comm-tab.active{background:rgba(79,114,255,0.14);border-color:rgba(79,114,255,0.4);color:var(--blue2)}
+.comm-sec{display:none}.comm-sec.active{display:block}
+.comm-stats{display:flex;gap:7px;padding:0 18px 14px}
+.comm-stat{flex:1;background:var(--bg2);border-radius:var(--r);padding:11px 8px;text-align:center;border:1px solid var(--border)}
+.comm-stat-n{font-family:var(--f-head);font-size:16px;font-weight:800;color:var(--t1)}
+.comm-stat-l{font-size:8.5px;color:var(--t4);margin-top:2px;text-transform:uppercase;letter-spacing:.4px}
+/* leaderboard */
+.lb-card{background:var(--bg2);border-radius:var(--r-lg);margin:0 18px 14px;overflow:hidden;border:1px solid var(--border)}
+.lb-row{display:flex;align-items:center;gap:9px;padding:11px 14px;border-bottom:1px solid var(--border)}
+.lb-row:last-child{border-bottom:none}
+.lb-rk{font-size:12px;font-weight:800;min-width:14px;text-align:center}
+.rk1{color:var(--gold)}.rk2{color:var(--silver)}.rk3{color:var(--bronze)}
+.lb-av{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0}
+.lb-info{flex:1}.lb-n{font-size:12px;font-weight:700;color:var(--t1)}.lb-m{font-size:9px;color:var(--t4);margin-top:1px}
+.lb-pnl{font-size:12px;font-weight:800;color:var(--green);margin-right:7px}
+.lb-vbdg{display:inline-block;background:rgba(79,114,255,0.12);color:var(--blue2);font-size:7.5px;font-weight:700;padding:1px 4px;border-radius:4px;margin-left:3px}
+.flw-btn{padding:4px 10px;background:rgba(79,114,255,0.1);border:1px solid rgba(79,114,255,0.22);border-radius:16px;color:var(--blue2);font-size:9px;font-weight:700;cursor:pointer;white-space:nowrap;margin:0;width:auto}
+.flw-btn.on{background:rgba(255,255,255,0.04);border-color:rgba(255,255,255,0.09);color:var(--t4)}
+/* lb add form */
+.lb-form{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r-lg);padding:14px;margin:0 18px 14px}
+.lb-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+.lb-form-field{display:flex;flex-direction:column;gap:4px}
+.lb-form-field.full{grid-column:1/-1}
+.lb-fld-lbl{font-size:8px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--t3)}
+.lb-fld-inp{background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:7px;padding:8px 9px;color:var(--t1);font-size:11.5px;font-family:var(--f-mono);font-weight:600;outline:none;transition:border-color .18s}
+.lb-fld-inp:focus{border-color:rgba(79,114,255,0.5)}
+.lb-fld-inp::placeholder{color:var(--t4);font-weight:400;font-size:11px;font-family:var(--f-body)}
+.lb-err{font-size:10px;color:var(--rose);min-height:14px;margin-bottom:5px}
+.lb-add-btn{width:100%;padding:10px;background:linear-gradient(135deg,var(--blue),var(--indigo));border:none;border-radius:9px;color:#fff;font-family:var(--f-head);font-size:12px;font-weight:700;cursor:pointer}
+/* news */
+.news-card{display:flex;gap:11px;background:var(--bg2);border-radius:12px;margin:0 18px 9px;padding:11px;cursor:pointer;border:1px solid var(--border);transition:border-color .2s;text-decoration:none}
+.news-card:hover{border-color:rgba(79,114,255,0.25)}
+.news-img{width:50px;height:50px;border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+.news-ttl{font-size:11.5px;font-weight:600;color:var(--t1);line-height:1.45;margin-bottom:4px}
+.news-mt{font-size:9px;color:var(--t4)}
+.ntag{display:inline-block;padding:1px 5px;border-radius:5px;font-size:8px;font-weight:700;margin-right:4px}
+.ntag.macro{background:rgba(245,183,49,0.1);color:var(--amber)}.ntag.crypto{background:rgba(79,114,255,0.1);color:var(--blue2)}.ntag.comm{background:rgba(0,200,122,0.1);color:var(--green)}.ntag.india{background:rgba(251,146,60,0.1);color:#fb923c}
+/* top traders (from top-traders.html) */
+.tt-ambient{position:absolute;top:-80px;left:50%;transform:translateX(-50%);width:500px;height:240px;background:radial-gradient(ellipse at center,rgba(59,130,246,0.06) 0%,transparent 65%);pointer-events:none}
+.tt-hero-eyebrow{display:inline-flex;align-items:center;gap:5px;background:rgba(240,180,41,0.08);border:1px solid rgba(240,180,41,0.18);border-radius:18px;padding:4px 11px;font-size:9.5px;font-weight:700;color:var(--gold);letter-spacing:.6px;text-transform:uppercase;margin-bottom:8px}
+.tt-hero-ttl{font-family:var(--f-display);font-size:26px;font-weight:900;color:#fff;letter-spacing:-.7px;line-height:1.1;margin-bottom:6px}
+.tt-hero-ttl .gld{background:linear-gradient(135deg,#fbbf24,#f59e0b,#d97706);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.tt-hero-sub{font-size:11px;color:var(--t4);line-height:1.55;max-width:260px;margin:0 auto}
+.tt-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;padding:0 18px;margin-bottom:12px}
+.tt-stat{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:9px 8px;text-align:center;transition:border-color .2s}
+.tt-stat:hover{border-color:rgba(255,255,255,0.11)}
+.tt-stat-v{font-family:var(--f-mono);font-size:16px;font-weight:700;color:#fff}
+.tt-stat-v.g{color:var(--gold)}.tt-stat-v.gr{color:var(--green)}.tt-stat-v.bl{color:var(--blue2)}.tt-stat-v.dim{color:var(--t4);font-size:11px;font-family:var(--f-body)}
+.tt-stat-l{font-size:8px;color:var(--t4);margin-top:2px;letter-spacing:.4px;text-transform:uppercase;font-weight:600}
+.tt-podium{display:grid;grid-template-columns:1fr 1.08fr 1fr;gap:7px;padding:0 14px 14px;align-items:end}
+.tt-pod{border-radius:14px;padding:12px 9px 11px;text-align:center;position:relative;overflow:hidden;border:1px solid var(--border);transition:transform .2s,box-shadow .2s;cursor:default}
+.tt-pod:hover{transform:translateY(-3px)}
+.tt-pod.p1{background:linear-gradient(180deg,rgba(30,20,5,0.9),var(--bg2));border-color:rgba(240,180,41,0.3);box-shadow:0 4px 28px rgba(240,180,41,0.08);min-height:152px}
+.tt-pod.p2{background:linear-gradient(180deg,rgba(10,18,30,0.9),var(--bg2));border-color:rgba(148,163,184,0.2);min-height:126px}
+.tt-pod.p3{background:linear-gradient(180deg,rgba(20,12,5,0.9),var(--bg2));border-color:rgba(184,115,51,0.2);min-height:112px}
+.tt-pod::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;border-radius:14px 14px 0 0}
+.p1::before{background:linear-gradient(90deg,transparent,var(--gold),transparent)}.p2::before{background:linear-gradient(90deg,transparent,var(--silver),transparent)}.p3::before{background:linear-gradient(90deg,transparent,var(--bronze),transparent)}
+.tt-pod-medal{font-size:18px;display:block;margin-bottom:4px}
+.tt-pod-av{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#fff;margin:0 auto 6px;border:2px solid transparent;font-family:var(--f-display)}
+.p1 .tt-pod-av{background:linear-gradient(135deg,#3d2800,#7a5000);border-color:var(--gold)}.p2 .tt-pod-av{background:linear-gradient(135deg,#151f2e,#243347);border-color:var(--silver)}.p3 .tt-pod-av{background:linear-gradient(135deg,#2a1500,#5c3010);border-color:var(--bronze)}
+.tt-pod-bdg{position:absolute;top:7px;right:7px;width:17px;height:17px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:800}
+.p1 .tt-pod-bdg{background:var(--gold);color:#000}.p2 .tt-pod-bdg{background:var(--silver);color:#000}.p3 .tt-pod-bdg{background:var(--bronze);color:#fff}
+.tt-pod-name{font-size:12px;font-weight:700;color:#fff;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tt-pod-profit{font-family:var(--f-mono);font-size:13px;font-weight:700;color:var(--green);margin-bottom:1px}
+.tt-pod-wr{font-size:9.5px;color:var(--t4)}
+.tt-pod-score{font-size:8px;color:rgba(255,255,255,0.2);margin-top:2px}
+.tt-row-list{padding:0 14px 14px;display:flex;flex-direction:column;gap:4px}
+.tt-lb-row{display:grid;grid-template-columns:34px 1fr auto auto;align-items:center;gap:0 7px;background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:9px 11px;transition:border-color .2s,background .2s,transform .2s}
+.tt-lb-row:hover{border-color:rgba(255,255,255,0.1);background:var(--bg3);transform:translateX(2px)}
+.tt-rk{font-family:var(--f-mono);font-size:12px;font-weight:700;color:var(--t4);text-align:center}
+.tt-row-info{min-width:0}
+.tt-row-name{font-size:12px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tt-row-sub{font-size:9px;color:var(--t4);margin-top:1px}
+.tt-row-profit{font-family:var(--f-mono);font-size:12px;font-weight:700;color:var(--green);text-align:right;white-space:nowrap}
+.tt-row-wr{font-size:9.5px;color:var(--t4);text-align:right;white-space:nowrap;min-width:48px}
+.tt-row-wr span{color:var(--t2);font-weight:600}
+.tt-empty{display:flex;flex-direction:column;align-items:center;padding:40px 20px 28px;text-align:center}
+.tt-empty-orb{width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,rgba(59,130,246,0.15),rgba(16,212,126,0.1));border:1px solid rgba(59,130,246,0.2);display:flex;align-items:center;justify-content:center;font-size:26px;margin-bottom:12px;animation:orbFloat 3s ease-in-out infinite}
+@keyframes orbFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+.tt-empty-ttl{font-family:var(--f-display);font-size:16px;font-weight:800;color:#fff;margin-bottom:6px}
+.tt-empty-sub{font-size:11px;color:var(--t4);line-height:1.6;max-width:220px}
+/* chat rooms */
+.room-item{display:flex;align-items:center;gap:11px;padding:12px 18px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .15s}
+.room-item:hover{background:rgba(255,255,255,0.02)}
+.room-ico{font-size:20px;width:24px;text-align:center;flex-shrink:0}
+.room-nm{font-size:12.5px;font-weight:600;color:var(--t1)}
+.room-on{font-size:9px;color:var(--t4);margin-top:1px;display:flex;align-items:center;gap:4px}
+.on-dot{width:5px;height:5px;border-radius:50%;background:var(--green);flex-shrink:0}
+/* challenges */
+.chal-card{background:linear-gradient(135deg,rgba(79,114,255,0.09),rgba(79,114,255,0.03));border:1px solid rgba(79,114,255,0.2);border-radius:var(--r-lg);margin:0 18px 14px;padding:16px}
+.chal-badge{display:inline-block;background:rgba(79,114,255,0.18);color:var(--blue2);font-size:7.5px;font-weight:700;letter-spacing:.9px;padding:2px 8px;border-radius:16px;margin-bottom:8px}
+.chal-ttl{font-family:var(--f-head);font-size:15px;font-weight:800;color:var(--t1);margin-bottom:5px}
+.chal-desc{font-size:11px;color:var(--t3);line-height:1.6;margin-bottom:11px}
+.chal-prog{height:5px;background:rgba(255,255,255,0.07);border-radius:3px;overflow:hidden;margin-bottom:4px}
+.chal-bar{height:100%;width:62%;background:linear-gradient(90deg,var(--blue2),var(--indigo));border-radius:3px}
+.chal-meta{display:flex;justify-content:space-between;margin-bottom:11px;font-size:9px;color:var(--t4)}
+.chal-join-btn{width:100%;padding:11px;background:linear-gradient(135deg,var(--blue),var(--indigo));border:none;border-radius:9px;color:#fff;font-family:var(--f-head);font-size:12px;font-weight:700;cursor:pointer}
+.prizes-row{display:flex;gap:7px;margin:0 18px}
+.prize-card{flex:1;background:var(--bg2);border-radius:var(--r);padding:11px;text-align:center;border:1px solid var(--border)}
+.prize-ico{font-size:18px;margin-bottom:3px}
+.prize-ttl{font-size:10.5px;font-weight:700;color:var(--t1)}
+.prize-sub{font-size:8.5px;color:var(--t4);margin-top:1px}
+
+/* ═══════════════════════════════════════════════════════
+   PAGE: CHAT
+═══════════════════════════════════════════════════════ */
+#pageChat{padding:0}
+.chat-hdr{flex-shrink:0;padding:12px 16px;background:rgba(8,10,20,0.9);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:11px}
+.chat-hdr-ico{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--blue),var(--indigo));display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.chat-hdr-ttl{font-family:var(--f-head);font-size:14px;font-weight:800;color:var(--t1)}
+.chat-hdr-sub{font-size:9.5px;color:var(--t3);margin-top:1px;display:flex;align-items:center;gap:4px}
+.conn-pill{display:flex;align-items:center;gap:4px;border-radius:16px;padding:3px 8px;font-family:var(--f-mono);font-size:8px;font-weight:700;transition:all .3s;margin-left:auto}
+.conn-pill.connecting{background:rgba(245,183,49,0.1);border:1px solid rgba(245,183,49,0.2);color:var(--amber)}
+.conn-pill.connected{background:rgba(0,200,122,0.09);border:1px solid rgba(0,200,122,0.2);color:var(--green)}
+.conn-pill.error{background:rgba(255,77,109,0.1);border:1px solid rgba(255,77,109,0.2);color:var(--rose)}
+.conn-dot{width:4px;height:4px;border-radius:50%;background:currentColor}
+.conn-pill.connected .conn-dot{animation:blink 2s infinite}
+/* username modal */
+.chat-modal-ov{position:fixed;inset:0;background:rgba(5,6,13,0.93);backdrop-filter:blur(20px);display:flex;align-items:center;justify-content:center;z-index:3000;padding:18px;animation:fdIn .25s ease}
+.chat-modal-ov.hidden{display:none}
+.chat-mc{background:var(--bg3);border:1px solid var(--border-hi);border-radius:20px;padding:30px 26px 26px;width:100%;max-width:360px;box-shadow:0 30px 70px rgba(0,0,0,0.6),var(--glow-blue);position:relative;overflow:hidden;animation:slUp .28s cubic-bezier(.23,1,.32,1)}
+.chat-mc::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(79,114,255,0.5),transparent)}
+.chat-mc-ico{width:48px;height:48px;border-radius:14px;background:linear-gradient(135deg,rgba(79,114,255,0.2),rgba(124,92,252,0.15));border:1px solid rgba(79,114,255,0.25);display:flex;align-items:center;justify-content:center;margin-bottom:16px}
+.chat-mc-ttl{font-family:var(--f-head);font-size:19px;font-weight:800;letter-spacing:-.3px;color:var(--t1);margin-bottom:4px}
+.chat-mc-sub{font-size:11.5px;color:var(--t3);line-height:1.55;margin-bottom:20px}
+.chat-fld-lbl{font-size:8.5px;font-weight:700;letter-spacing:.9px;text-transform:uppercase;color:var(--t4);margin-bottom:5px}
+.chat-fld-inp{width:100%;background:var(--bg1);border:1px solid var(--border);border-radius:10px;padding:11px 13px;color:var(--t1);font-size:13px;font-family:var(--f-body);outline:none;caret-color:var(--blue);transition:all .2s;margin-bottom:4px}
+.chat-fld-inp:focus{border-color:var(--border-hi);background:rgba(79,114,255,0.04);box-shadow:0 0 0 3px rgba(79,114,255,0.1)}
+.chat-fld-hint{font-size:9.5px;color:var(--t4);margin-bottom:16px}
+.chat-fld-err{font-size:9.5px;color:var(--rose);margin-bottom:8px;display:none}
+.chat-fld-err.show{display:block}
+.chat-mc-btn{width:100%;padding:12px;border-radius:10px;background:linear-gradient(135deg,var(--blue),var(--indigo));border:none;color:#fff;font-family:var(--f-head);font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 4px 18px rgba(79,114,255,0.32)}
+.user-strip{display:flex;align-items:center;gap:7px;padding:6px 14px;background:rgba(79,114,255,0.04);border-bottom:1px solid var(--border);flex-shrink:0}
+.us-av{width:18px;height:18px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:7.5px;font-weight:800;color:#fff}
+.us-name{font-size:10px;font-weight:600;color:var(--t3)}
+.us-badge{font-family:var(--f-mono);font-size:8px;font-weight:600;background:rgba(79,114,255,0.12);border:1px solid rgba(79,114,255,0.2);color:var(--blue);border-radius:4px;padding:1px 5px}
+.us-change{margin-left:auto;font-size:9px;font-weight:600;color:var(--blue);cursor:pointer;padding:2px 6px;border-radius:4px}
+.us-change:hover{background:rgba(79,114,255,0.1)}
+.chat-load-ov{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:11px}
+.chat-load-ov.hidden{display:none}
+.chat-spinner{width:30px;height:30px;border:2px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.chat-load-txt{font-size:11px;color:var(--t3)}
+.chat-msgs{flex:1;overflow-y:auto;overflow-x:hidden;padding:14px 12px 7px;display:flex;flex-direction:column;gap:2px;scroll-behavior:smooth}
+.chat-msgs::-webkit-scrollbar{display:none}
+.dt-div{display:flex;align-items:center;gap:8px;margin:8px 0 5px}
+.dt-line{flex:1;height:1px;background:var(--border)}
+.dt-txt{font-family:var(--f-mono);font-size:7.5px;color:var(--t4);letter-spacing:.4px;white-space:nowrap}
+.msg-row{display:flex;gap:7px;align-items:flex-end;padding:1px 0;animation:msgIn .25s cubic-bezier(.23,1,.32,1) both}
+@keyframes msgIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+.msg-row.own{flex-direction:row-reverse}
+.msg-av{width:28px;height:28px;border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-family:var(--f-head);font-size:10px;font-weight:800;color:#fff;margin-bottom:1px}
+.msg-av.hidden{visibility:hidden}
+.msg-grp{display:flex;flex-direction:column;gap:2px;max-width:72%}
+.msg-row.own .msg-grp{align-items:flex-end}
+.msg-meta{display:flex;align-items:center;gap:5px;margin-bottom:3px;padding:0 2px}
+.msg-row.own .msg-meta{flex-direction:row-reverse}
+.msg-uname{font-size:10px;font-weight:700;color:var(--t2)}
+.msg-time{font-family:var(--f-mono);font-size:7.5px;color:var(--t4)}
+.msg-bubble{padding:8px 12px;border-radius:12px;font-size:12.5px;line-height:1.55;color:var(--t1);word-break:break-word;box-shadow:0 2px 8px rgba(0,0,0,.28)}
+.msg-row:not(.own) .msg-bubble{background:var(--bg4);border:1px solid var(--border);border-bottom-left-radius:3px}
+.msg-row.own .msg-bubble{background:linear-gradient(135deg,var(--blue),var(--indigo));border:1px solid rgba(79,114,255,0.4);border-bottom-right-radius:3px;box-shadow:0 4px 14px rgba(79,114,255,0.2)}
+.chat-empty-state{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;text-align:center;padding:28px 18px}
+.chat-empty-ico{width:52px;height:52px;border-radius:15px;background:var(--bg3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;margin-bottom:2px}
+.chat-empty-ttl{font-family:var(--f-head);font-size:14px;font-weight:800;color:var(--t2)}
+.chat-empty-sub{font-size:11px;color:var(--t3);max-width:190px;line-height:1.6}
+.new-msg-pill{position:absolute;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,var(--blue),var(--indigo));border:none;border-radius:16px;padding:5px 12px;font-size:9.5px;font-weight:700;color:#fff;cursor:pointer;display:flex;align-items:center;gap:4px;box-shadow:0 4px 14px rgba(79,114,255,0.38);z-index:10;animation:pillIn .22s ease;font-family:var(--f-body)}
+.new-msg-pill.hidden{display:none}
+@keyframes pillIn{from{opacity:0;transform:translateX(-50%) translateY(5px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+.chat-typing{height:18px;flex-shrink:0;padding:0 16px;font-size:9.5px;color:var(--t4);font-style:italic}
+.chat-inp-area{flex-shrink:0;padding:9px 11px 11px;background:rgba(8,10,20,0.96);border-top:1px solid var(--border);backdrop-filter:blur(20px);position:relative}
+.chat-inp-wrap{display:flex;align-items:center;gap:8px;background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:0 5px 0 13px;height:44px;transition:border-color .2s,box-shadow .2s}
+.chat-inp-wrap:focus-within{border-color:var(--border-hi);box-shadow:0 0 0 3px rgba(79,114,255,0.08)}
+.chat-inp{flex:1;background:none;border:none;outline:none;color:var(--t1);font-size:12.5px;font-family:var(--f-body);caret-color:var(--blue);height:100%}
+.chat-inp::placeholder{color:var(--t4);font-size:11.5px}
+.chat-inp:disabled{opacity:.4}
+.char-ct{font-family:var(--f-mono);font-size:8px;color:var(--t4);white-space:nowrap;flex-shrink:0}
+.char-ct.warn{color:var(--amber)}.char-ct.over{color:var(--rose)}
+.chat-send-btn{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,var(--blue),var(--indigo));border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 3px 10px rgba(79,114,255,0.3);transition:all .2s}
+.chat-send-btn:hover{transform:translateY(-1px);box-shadow:0 5px 16px rgba(79,114,255,0.44)}
+.chat-send-btn:disabled{opacity:.35;cursor:not-allowed;transform:none}
+
+/* ═══════════════════════════════════════════════════════
+   PAGE: MENU
+═══════════════════════════════════════════════════════ */
+.menu-topbar-row{display:flex;justify-content:flex-end;padding:14px 16px 6px}
+.settings-icon{width:28px;height:28px;border:1.5px solid rgba(255,255,255,0.25);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--t3)}
+.prof-card{background:var(--bg2);border-radius:15px;margin:0 15px 11px;padding:15px 15px 0;border:1px solid var(--border)}
+.prof-card-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:15px}
+.prof-left{display:flex;align-items:center;gap:12px}
+.prof-av{width:50px;height:50px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--indigo));display:flex;align-items:center;justify-content:center;font-size:19px;font-weight:700;color:#fff;flex-shrink:0}
+.prof-h2{margin:0 0 3px;font-size:14px;font-weight:700;color:var(--t1)}
+.basic-badge{display:inline-block;padding:1px 8px;font-size:8.5px;font-weight:700;letter-spacing:.7px;color:var(--t4);border:1px solid var(--border);border-radius:16px}
+.chev{font-size:18px;color:var(--t4);font-weight:300}
+.prof-stats{display:flex;border-top:1px solid var(--border);padding:10px 0 12px}
+.ps-item{flex:1;display:flex;flex-direction:column;padding-left:2px}
+.ps-item+.ps-item{padding-left:12px}
+.ps-num{font-size:15px;font-weight:700;color:var(--t1);line-height:1.2}
+.ps-lbl{font-size:9.5px;color:var(--t4);margin-top:1px}
+.menu-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 15px 11px}
+.menu-box{background:var(--bg2);border-radius:13px;padding:12px;min-height:104px;display:flex;flex-direction:column;cursor:pointer;border:1px solid var(--border);transition:border-color .2s}
+.menu-box:hover{border-color:rgba(79,114,255,0.28)}
+.menu-box-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:11px}
+.box-icon{width:21px;height:21px;stroke:rgba(255,255,255,0.65);fill:none}
+.menu-box h3{margin:0 0 3px;font-size:12.5px;font-weight:600;color:var(--t1)}
+.menu-box p{margin:0;font-size:9.5px;color:var(--t4);line-height:1.4}
+.promo-box{margin:0 15px 18px;background:var(--bg2);border-radius:13px;padding:16px 14px;position:relative;overflow:hidden;border:1px solid var(--border)}
+.promo-box::after{content:'';position:absolute;bottom:0;right:0;width:55%;height:65%;background:radial-gradient(ellipse at bottom right,rgba(79,114,255,0.38),rgba(124,92,252,0.18),transparent 70%);pointer-events:none}
+.promo-box h3{margin:0 0 4px;font-size:13px;font-weight:700;color:var(--t1);position:relative;z-index:1}
+.promo-box p{margin:0;font-size:10.5px;color:var(--t3);position:relative;z-index:1}
+.menu-list{margin:0 15px}
+.menu-list-item{display:flex;align-items:center;gap:12px;padding:13px 3px;cursor:pointer}
+.menu-list-item:hover .list-lbl{color:var(--blue2)}
+.list-ico{width:22px;height:22px;display:flex;align-items:center;justify-content:center;color:var(--t3);flex-shrink:0}
+.list-lbl{font-size:12.5px;font-weight:500;color:var(--t1);flex:1}
+.list-chev{font-size:17px;color:var(--t4)}
+.menu-div{height:1px;background:var(--border);margin:0 3px}
+
+/* SUB-PANELS */
+.sub-panel{position:fixed;top:0;left:0;width:100%;height:100%;background:var(--bg1);z-index:1500;padding:0 0 90px;overflow-y:auto;display:none;animation:pgIn .22s ease}
+.sub-panel.open{display:block}
+.sub-hdr{display:flex;align-items:center;gap:10px;padding:13px 15px 11px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg1);z-index:1}
+.sub-back{width:32px;height:32px;background:rgba(255,255,255,0.06);border:none;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;color:var(--t1)}
+.sub-back:hover{background:rgba(255,255,255,0.09)}
+.sub-title{font-size:15px;font-weight:700;color:var(--t1)}
+.sub-sec-lbl{font-size:9.5px;font-weight:700;letter-spacing:.9px;color:var(--t4);text-transform:uppercase;padding:16px 15px 7px}
+.help-search{display:flex;align-items:center;gap:8px;background:var(--bg2);border-radius:10px;margin:11px 15px 3px;padding:10px 12px}
+.help-search svg{color:var(--t4);flex-shrink:0}
+.help-search input{background:none;border:none;outline:none;color:var(--t1);font-size:12.5px;width:100%;padding:0;margin:0}
+.help-search input::placeholder{color:var(--t4)}
+.help-card{background:var(--bg2);border-radius:12px;margin:0 15px 8px;padding:12px 14px;cursor:pointer;border:1px solid var(--border)}
+.faq-q{font-size:12.5px;font-weight:600;color:var(--t1);display:flex;justify-content:space-between;align-items:center;gap:7px}
+.faq-arr{font-size:15px;color:var(--t4);transition:transform .2s;flex-shrink:0}
+.faq-a{display:none;font-size:11.5px;color:var(--t3);line-height:1.6;margin-top:8px}
+.contact-card{cursor:default}
+.contact-row{display:flex;align-items:center;gap:12px;padding:3px 0}
+.contact-row svg{stroke:var(--t3);flex-shrink:0}
+.contact-lbl{font-size:10.5px;color:var(--t4);margin-bottom:1px}
+.contact-val{font-size:12.5px;font-weight:500;color:var(--t1)}
+.contact-div{height:1px;background:var(--border);margin:10px 0}
+.guide-list{margin:0 15px}
+.guide-item{display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)}
+.guide-item:last-child{border-bottom:none}
+.guide-num{font-size:11.5px;font-weight:700;color:var(--t4);min-width:20px;padding-top:1px}
+.guide-ttl{font-size:12.5px;font-weight:600;color:var(--t1);margin-bottom:2px}
+.guide-sub-txt{font-size:10.5px;color:var(--t4);line-height:1.5}
+.about-logo-blk{display:flex;flex-direction:column;align-items:center;padding:24px 15px 13px}
+.about-logo-cir{width:64px;height:64px;border-radius:17px;background:linear-gradient(135deg,var(--blue),var(--indigo));display:flex;align-items:center;justify-content:center;font-size:19px;font-weight:800;color:#fff;margin-bottom:10px}
+.about-app-name{font-size:18px;font-weight:800;color:var(--t1);margin-bottom:3px}
+.about-ver{font-size:10.5px;color:var(--t4)}
+.about-card{background:var(--bg2);border-radius:12px;margin:0 15px 8px;padding:14px;border:1px solid var(--border)}
+.about-desc{font-size:12.5px;color:var(--t2);line-height:1.7;margin:0}
+.feat-item{display:flex;align-items:center;gap:12px;padding:4px 0}
+.feat-item svg{flex-shrink:0}.feat-item span{font-size:12.5px;color:var(--t1);font-weight:500}
+.feat-div{height:1px;background:var(--border);margin:7px 0}
+.mission-txt{font-size:13px;font-weight:600;color:var(--t2);line-height:1.6;margin:0}
+.prem-hero{text-align:center;padding:24px 15px 8px}
+.prem-crown{font-size:40px;display:block;margin-bottom:10px}
+.prem-ttl{font-size:20px;font-weight:800;color:var(--t1);margin-bottom:4px}
+.prem-sub{font-size:11.5px;color:var(--t4)}
+.pf-list{margin:0 15px}
+.pf-item{display:flex;align-items:flex-start;gap:12px;background:var(--bg2);border-radius:12px;padding:13px;margin-bottom:8px;border:1px solid var(--border)}
+.pf-ico{width:36px;height:36px;border-radius:10px;background:rgba(79,114,255,0.1);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.pf-ttl{font-size:12.5px;font-weight:700;color:var(--t1);margin-bottom:2px}
+.pf-sub-txt{font-size:10.5px;color:var(--t4);line-height:1.5}
+.price-card{background:var(--bg2);border-radius:12px;margin:0 15px 12px;padding:14px;border:1px solid var(--border)}
+.price-row{display:flex;align-items:center;justify-content:space-between}
+.price-lbl{font-size:10.5px;color:var(--t4);margin-bottom:3px}
+.price-val{font-size:22px;font-weight:800;color:var(--t1)}
+.price-per{font-size:12px;font-weight:400;color:var(--t4)}
+.price-badge{background:rgba(79,114,255,0.14);color:var(--blue2);font-size:9.5px;font-weight:700;letter-spacing:.7px;padding:4px 10px;border-radius:16px}
+.action-btn{display:block;width:calc(100% - 30px);margin:0 15px;padding:14px;background:linear-gradient(90deg,var(--blue),var(--blue2));color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer}
+.prem-note{text-align:center;font-size:10.5px;color:var(--t4);margin-top:8px}
+.invite-hero{text-align:center;padding:24px 15px 8px}
+.inv-ico-wrap{width:64px;height:64px;border-radius:50%;background:rgba(79,114,255,0.1);display:flex;align-items:center;justify-content:center;margin:0 auto 12px}
+.inv-ttl{font-size:18px;font-weight:800;color:var(--t1);margin-bottom:4px}
+.inv-sub{font-size:11.5px;color:var(--t4);line-height:1.5}
+.inv-code-card{display:flex;align-items:center;justify-content:space-between;background:var(--bg2);border-radius:12px;margin:0 15px 8px;padding:14px 16px;border:1px solid var(--border)}
+.inv-code{font-size:19px;font-weight:800;letter-spacing:3px;color:var(--t1)}
+.copy-btn{display:flex;align-items:center;gap:5px;background:rgba(79,114,255,0.12);border:none;border-radius:8px;padding:8px 12px;color:var(--blue2);font-size:12px;font-weight:700;cursor:pointer;margin:0;width:auto}
+.share-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:0 15px 8px}
+.share-item{display:flex;flex-direction:column;align-items:center;gap:7px;cursor:pointer}
+.share-ico{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center}
+.si-green{background:rgba(37,211,102,0.12);color:#25d366}.si-green svg{stroke:#25d366}
+.si-blue{background:rgba(41,182,246,0.12)}.si-blue svg{stroke:#29b6f6}
+.si-sky{background:rgba(100,181,246,0.12)}.si-sky svg{stroke:#64b5f6}
+.si-gray{background:rgba(255,255,255,0.06)}.si-gray svg{stroke:var(--t3)}
+.share-item span{font-size:9.5px;color:var(--t3);font-weight:500}
+.inv-reward-card{display:flex;align-items:center;gap:12px;background:var(--bg2);border-radius:12px;margin:0 15px;padding:14px;border:1px solid var(--border)}
+.rwd-ttl{font-size:12.5px;font-weight:700;color:var(--t1);margin-bottom:2px}
+.rwd-sub{font-size:10.5px;color:var(--t4)}
+/* rate popup */
+.popup-ov{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.76);z-index:4000;display:flex;align-items:center;justify-content:center;padding:18px}
+.popup-ov.hidden{display:none}
+.popup-box{background:var(--bg2);border-radius:18px;width:100%;max-width:300px;padding:24px 20px;border:1px solid var(--border)}
+.popup-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.popup-ttl{font-size:16px;font-weight:700;color:var(--t1)}
+.popup-cls{background:rgba(255,255,255,0.06);border:none;border-radius:50%;width:28px;height:28px;color:var(--t3);font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;margin:0}
+.popup-sub{font-size:11.5px;color:var(--t4);margin:0 0 16px}
+.star-row{display:flex;justify-content:center;gap:8px;margin-bottom:10px}
+.star{font-size:34px;color:rgba(255,255,255,0.16);cursor:pointer;transition:color .15s,transform .15s;line-height:1}
+.star.active{color:var(--gold);transform:scale(1.1)}.star:hover{color:var(--gold)}
+.rate-msg{text-align:center;font-size:12px;font-weight:600;color:var(--blue2);min-height:16px;margin:0 0 14px}
+
+/* ═══════════════════════════════════════════════════════
+   RESPONSIVE
+═══════════════════════════════════════════════════════ */
+@media(max-width:540px){
+  .qs-grid{grid-template-columns:1fr 1fr;gap:7px}
+  .sim-shell{grid-template-columns:1fr;grid-template-rows:46px 52vh auto}
+  .sim-side{max-height:44vh}
+  .tt-podium{grid-template-columns:1fr 1.06fr 1fr;gap:5px}
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════
+     PAGE: HOME / WATCHLIST
+═══════════════════════════════════════════════════════════ -->
+<div id="pageHome" class="page active">
+  <div class="home-hero">
+    <div class="home-greet">Welcome back 👋</div>
+    <div class="home-tag">TradeX <span class="acc">AI</span><br>Your Markets Edge</div>
+  </div>
+  <div class="qs-grid" style="padding:14px 18px">
+    <div class="qs-card"><div class="qs-val" id="qs-btc">—</div><div class="qs-lbl">BTC/USDT</div></div>
+    <div class="qs-card"><div class="qs-val" id="qs-eth">—</div><div class="qs-lbl">ETH/USDT</div></div>
+    <div class="qs-card"><div class="qs-val" id="qs-eur">—</div><div class="qs-lbl">EUR/USD</div></div>
+  </div>
+  <div class="sec-row"><div class="sec-line"></div><span class="sec-txt">Watchlist</span><div class="sec-line"></div></div>
+  <div id="homeWatchlist">
+    <div class="wl-item" onclick="navTo('explore')">
+      <div class="wl-ico" style="background:#f7931a22;border:1px solid #f7931a44"><span style="color:#f7931a">₿</span></div>
+      <div style="flex:1"><div class="wl-name">Bitcoin</div><div class="wl-tick">BTC/USDT</div></div>
+      <div style="text-align:right"><div class="wl-price" id="wl-btc-price">—</div><div class="wl-chg up" id="wl-btc-chg">—</div></div>
+    </div>
+    <div class="wl-item" onclick="navTo('explore')">
+      <div class="wl-ico" style="background:#7c5cfc22;border:1px solid #7c5cfc44"><span style="color:#7c5cfc">⟠</span></div>
+      <div style="flex:1"><div class="wl-name">Ethereum</div><div class="wl-tick">ETH/USDT</div></div>
+      <div style="text-align:right"><div class="wl-price" id="wl-eth-price">—</div><div class="wl-chg up" id="wl-eth-chg">—</div></div>
+    </div>
+    <div class="wl-item" onclick="navTo('explore')">
+      <div class="wl-ico" style="background:#4f72ff22;border:1px solid #4f72ff44"><span style="color:#4f72ff">€</span></div>
+      <div style="flex:1"><div class="wl-name">EUR / USD</div><div class="wl-tick">EURUSD</div></div>
+      <div style="text-align:right"><div class="wl-price" id="wl-eur-price">—</div><div class="wl-chg up" id="wl-eur-chg">—</div></div>
+    </div>
+  </div>
+  <div style="height:16px"></div>
+  <div class="sec-row"><div class="sec-line"></div><span class="sec-txt">Quick Actions</span><div class="sec-line"></div></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 18px;margin-bottom:18px">
+    <button onclick="navTo('chart')" style="padding:14px;background:linear-gradient(135deg,var(--blue),var(--indigo));border:none;border-radius:13px;color:#fff;font-family:var(--f-head);font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 4px 18px rgba(79,114,255,0.35)">▲ Start Trading</button>
+    <button onclick="navTo('explore')" style="padding:14px;background:var(--bg2);border:1px solid var(--border);border-radius:13px;color:var(--t2);font-family:var(--f-head);font-size:13px;font-weight:700;cursor:pointer">🔍 Explore</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     PAGE: EXPLORE
+═══════════════════════════════════════════════════════════ -->
+<div id="pageExplore" class="page">
+  <div class="exp-shell">
+    <div class="pg-header" style="padding-top:18px">
+      <div class="pg-logo-row">
+        <div class="pg-logo"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.95)" stroke-width="1.8"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg></div>
+        <div><div class="pg-title">Explore</div><div class="pg-sub">Scanner · Overview · Ideas · Strategy</div></div>
+      </div>
+      <div class="live-badge"><span class="live-dot"></span>MARKET LIVE</div>
+    </div>
+
+    <!-- SCANNER -->
+    <div class="scanner-wrap">
+      <div class="sec-row" style="padding:0;margin-bottom:10px"><div class="sec-line"></div><span class="sec-txt">AI Market Scanner</span><div class="sec-line"></div></div>
+      <div class="scanner-card">
+        <div class="sc-header">
+          <div class="sc-icon"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="rgba(79,114,255,0.9)" stroke-width="1.7"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg></div>
+          <div><div class="sc-title">AI Market Scanner</div><div class="sc-sub">Real-time trend — BTC, ETH, EURUSD</div></div>
+        </div>
+        <div class="sc-input-row">
+          <input class="sc-input" id="scannerInput" type="text" placeholder="BTC, ETH, EURUSD…" autocomplete="off"/>
+          <button class="sc-btn" onclick="runScanner()">⚡ Scan</button>
+        </div>
+        <div class="sc-presets">
+          <span class="preset-chip" onclick="quickScan('BTCUSDT')">BTCUSDT</span>
+          <span class="preset-chip" onclick="quickScan('ETHUSDT')">ETHUSDT</span>
+          <span class="preset-chip" onclick="quickScan('EURUSD')">EURUSD</span>
+        </div>
+        <div class="sc-result" id="scannerResult">
+          <div class="sc-sym-row"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="color:var(--blue2)"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><span class="sc-sym-txt" id="scanSymbolLabel"></span></div>
+          <div class="res-grid">
+            <div class="res-card"><div class="res-lbl">Trend</div><div class="res-val neutral" id="rTrend">—</div></div>
+            <div class="res-card"><div class="res-lbl">Confidence</div><div class="res-val neutral" id="rConf">—</div><div class="conf-bar"><div class="conf-fill mid" id="rConfBar" style="width:0%"></div></div></div>
+            <div class="res-card"><div class="res-lbl">Setup</div><div class="res-val neutral" id="rSetup" style="font-size:13px;margin-top:2px">—</div></div>
+          </div>
+          <div class="lvl-grid">
+            <div class="lvl-card"><div class="lvl-lbl">Entry</div><div class="lvl-val" id="rEntry">—</div></div>
+            <div class="lvl-card"><div class="lvl-lbl">Stop Loss</div><div class="lvl-val sl" id="rSL">—</div></div>
+            <div class="lvl-card"><div class="lvl-lbl">Take Profit</div><div class="lvl-val tp" id="rTP">—</div></div>
+          </div>
+          <div class="disc-row" id="rDisclaimer">⚠️ Approx levels – Not financial advice</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MARKET OVERVIEW -->
+    <div style="margin-bottom:30px">
+      <div class="sec-row" style="padding:0;margin-bottom:10px"><div class="sec-line"></div><span class="sec-txt">Market Overview</span><div class="sec-line"></div></div>
+      <div class="mk-grid" id="marketGrid"></div>
+    </div>
+
+    <!-- TRADE IDEAS -->
+    <div style="margin-bottom:30px">
+      <div class="sec-row" style="padding:0;margin-bottom:10px"><div class="sec-line"></div><span class="sec-txt">Trade Ideas Feed</span><div class="sec-line"></div></div>
+      <div class="idea-grid" id="ideasGrid"></div>
+    </div>
+
+    <!-- STRATEGY ENGINE -->
+    <div style="margin-bottom:30px">
+      <div class="sec-row" style="padding:0;margin-bottom:10px"><div class="sec-line"></div><span class="sec-txt">Strategy Engine</span><div class="sec-line"></div></div>
+      <button class="strat-trigger-btn" onclick="openStratModal()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        📊 Strategies
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- STRATEGY MODAL -->
+<div class="modal-bg" id="strategyModal" onclick="handleModalBgClick(event)">
+  <div class="strat-modal">
+    <div class="modal-hdr">
+      <div class="modal-ttl-row">
+        <div class="modal-ico"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="rgba(79,114,255,0.9)" stroke-width="1.8"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div>
+        <div><div class="modal-ttl">Strategy Engine</div><div class="modal-sub">Preview strategies on live candlestick charts</div></div>
+      </div>
+      <button class="modal-cls" onclick="closeStratModal()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <div class="modal-body">
+      <div class="strat-list-panel" id="strategyList"></div>
+      <div class="strat-chart-panel">
+        <div class="chart-info-bar">
+          <div><div class="chart-strat-name" id="chartStratName">Select a strategy</div><div class="chart-strat-desc" id="chartStratDesc">Click any strategy on the left to preview on a candlestick chart.</div><div class="chart-tags" id="chartStratTags"></div></div>
+        </div>
+        <div class="chart-container"><div id="strategyChart"></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     PAGE: CHART / SIMULATOR
+═══════════════════════════════════════════════════════════ -->
+<div id="pageChart" class="page">
+  <div class="sim-shell">
+    <div class="sim-topbar">
+      <div class="sim-logo">Trade<span>X</span>pro</div>
+      <div class="sym-wrap" id="symWrap">
+        <button class="sym-btn active" data-sym="XAUUSD" data-full="Gold / USD" onclick="switchSym(this)">GOLD</button>
+        <button class="sym-btn" data-sym="BTCUSD" data-full="Bitcoin / USD" onclick="switchSym(this)">BTC</button>
+        <button class="sym-btn" data-sym="EURUSD" data-full="Euro / USD" onclick="switchSym(this)">EUR/USD</button>
+        <button class="sym-btn" data-sym="GBPUSD" data-full="GBP / USD" onclick="switchSym(this)">GBP/USD</button>
+        <button class="sym-btn" data-sym="ETHUSD" data-full="Ethereum / USD" onclick="switchSym(this)">ETH</button>
+        <button class="sym-btn" data-sym="NASDAQ" data-full="NASDAQ 100" onclick="switchSym(this)">NAS100</button>
+      </div>
+      <div class="lp-bar">
+        <span class="sim-dot"></span>
+        <span class="lp-sym" id="lpSym">XAUUSD</span>
+        <span class="lp-val" id="lpVal">—</span>
+        <span class="lp-chg up" id="lpChg">—</span>
+      </div>
+    </div>
+    <div class="sim-chart-area"><div id="tv-widget"></div></div>
+    <div class="sim-side">
+      <div class="inst-blk">
+        <div class="inst-name" id="instName">XAUUSD</div>
+        <div class="inst-full" id="instFull">Gold / US Dollar</div>
+        <div class="p-row"><div class="p-big" id="instPrice">—</div><div class="p-chg up" id="instChg">—</div></div>
+        <div class="ohlc">
+          <div class="ohlc-item"><span class="ohlc-lbl">BID</span><span class="ohlc-val" id="oBid">—</span></div>
+          <div class="ohlc-item"><span class="ohlc-lbl">ASK</span><span class="ohlc-val" id="oAsk">—</span></div>
+          <div class="ohlc-item"><span class="ohlc-lbl">SPREAD</span><span class="ohlc-val" id="oSpread">—</span></div>
+          <div class="ohlc-item"><span class="ohlc-lbl">CHG%</span><span class="ohlc-val" id="oChgPct">—</span></div>
+        </div>
+      </div>
+      <div class="sim-sec-hd">New Order</div>
+      <div class="trade-blk">
+        <div class="trade-type-row">
+          <button class="tt-btn buy active" id="btnBuy" onclick="setSimDir('buy')">▲ BUY</button>
+          <button class="tt-btn sell" id="btnSell" onclick="setSimDir('sell')">▼ SELL</button>
+        </div>
+        <div class="fld-row"><div class="fld-lbl">Lot Size</div><input class="sim-inp" id="inpLot" type="number" value="0.1" min="0.01" step="0.01"/></div>
+        <div class="sl-tp">
+          <div class="fld-row" style="margin:0"><div class="fld-lbl">Stop Loss</div><input class="sim-inp" id="inpSL" type="number" placeholder="Optional"/></div>
+          <div class="fld-row" style="margin:0"><div class="fld-lbl">Take Profit</div><input class="sim-inp" id="inpTP" type="number" placeholder="Optional"/></div>
+        </div>
+        <button class="exec-btn buy-e" id="execBtn" onclick="openSimTrade()">EXECUTE BUY</button>
+      </div>
+      <div class="sim-sec-hd">Open Positions <span id="posCount" style="color:var(--blue2);margin-left:2px"></span></div>
+      <div class="pos-blk" id="posBlock"><div class="no-pos" id="noPos">No open positions</div></div>
+      <div class="sim-sec-hd">Account</div>
+      <div class="acc-blk">
+        <div class="acc-grid">
+          <div class="acc-item"><div class="acc-lbl">Balance</div><div class="acc-val" id="accBalance">$10,000.00</div></div>
+          <div class="acc-item"><div class="acc-lbl">Equity</div><div class="acc-val" id="accEquity">$10,000.00</div></div>
+          <div class="acc-item"><div class="acc-lbl">Floating P&amp;L</div><div class="acc-val" id="accPnl">$0.00</div></div>
+          <div class="acc-item"><div class="acc-lbl">Trades</div><div class="acc-val" id="accTrades">0</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     PAGE: COMMUNITY
+═══════════════════════════════════════════════════════════ -->
+<div id="pageCommunity" class="page">
+  <div class="pg-header">
+    <div class="pg-logo-row">
+      <div class="pg-logo"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.9)" stroke-width="1.8"><circle cx="9" cy="7" r="3"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/><circle cx="18" cy="7" r="2"/><path d="M21 21v-1a3 3 0 0 0-2-2.83"/></svg></div>
+      <div><div class="pg-title">Community</div><div class="pg-sub">Connect · Learn · Trade Together</div></div>
+    </div>
+  </div>
+  <div class="comm-stats">
+    <div class="comm-stat"><div class="comm-stat-n">4.2K</div><div class="comm-stat-l">Members</div></div>
+    <div class="comm-stat"><div class="comm-stat-n">318</div><div class="comm-stat-l">Online</div></div>
+    <div class="comm-stat"><div class="comm-stat-n">1.1K</div><div class="comm-stat-l">Ideas</div></div>
+  </div>
+  <div class="comm-tabs">
+    <button class="comm-tab active" onclick="setCommTab('leaderboard',this)">Leaderboard</button>
+    <button class="comm-tab" onclick="setCommTab('top-traders',this)">Top Traders</button>
+    <button class="comm-tab" onclick="setCommTab('news',this)">News</button>
+    <button class="comm-tab" onclick="setCommTab('chat-rooms',this)">Chat Rooms</button>
+    <button class="comm-tab" onclick="setCommTab('challenges',this)">Challenges</button>
+  </div>
+
+  <!-- ── LEADERBOARD TAB ── -->
+  <div class="comm-sec active" id="comm-leaderboard">
+    <div style="padding:0 18px 9px;font-size:9.5px;color:var(--t4)">Ranked by all-time PnL performance</div>
+    <div class="lb-card" id="lbCard">
+      <div class="lb-row"><span class="lb-rk rk1">1</span><div class="lb-av" style="background:#1a3a7a">RK</div><div class="lb-info"><div class="lb-n">Raj_Kumar<span class="lb-vbdg">✓ PRO</span></div><div class="lb-m">482 followers</div></div><span class="lb-pnl">+184%</span><button class="flw-btn on" onclick="toggleFlw(this)">Following</button></div>
+      <div class="lb-row"><span class="lb-rk rk2">2</span><div class="lb-av" style="background:#1a5a3a">AM</div><div class="lb-info"><div class="lb-n">AlphaM<span class="lb-vbdg">✓ PRO</span></div><div class="lb-m">361 followers</div></div><span class="lb-pnl">+156%</span><button class="flw-btn" onclick="toggleFlw(this)">Follow</button></div>
+      <div class="lb-row"><span class="lb-rk rk3">3</span><div class="lb-av" style="background:#5a1a6a">ZT</div><div class="lb-info"><div class="lb-n">ZeroTF</div><div class="lb-m">219 followers</div></div><span class="lb-pnl">+129%</span><button class="flw-btn" onclick="toggleFlw(this)">Follow</button></div>
+      <div class="lb-row"><span class="lb-rk" style="color:var(--t4)">4</span><div class="lb-av" style="background:#6a3a1a">NX</div><div class="lb-info"><div class="lb-n">NiftyX</div><div class="lb-m">178 followers</div></div><span class="lb-pnl">+112%</span><button class="flw-btn" onclick="toggleFlw(this)">Follow</button></div>
+      <div class="lb-row"><span class="lb-rk" style="color:var(--t4)">5</span><div class="lb-av" style="background:#3a5a2a">VT</div><div class="lb-info"><div class="lb-n">VixTrader</div><div class="lb-m">134 followers</div></div><span class="lb-pnl">+98%</span><button class="flw-btn" onclick="toggleFlw(this)">Follow</button></div>
+    </div>
+    <!-- Log Results form -->
+    <div style="padding:14px 18px 4px;font-size:9px;color:var(--t4);text-transform:uppercase;letter-spacing:.7px;font-weight:700">Log Your Results</div>
+    <div class="lb-form">
+      <div class="lb-form-grid">
+        <div class="lb-form-field full"><div class="lb-fld-lbl">Username</div><input class="lb-fld-inp" id="fName" type="text" placeholder="e.g. Raj_Kumar" maxlength="20" autocomplete="off"/></div>
+        <div class="lb-form-field"><div class="lb-fld-lbl">Profit %</div><input class="lb-fld-inp" id="fProfit" type="number" placeholder="+38.5" step="0.1"/></div>
+        <div class="lb-form-field"><div class="lb-fld-lbl">Win Rate %</div><input class="lb-fld-inp" id="fWR" type="number" placeholder="72" min="0" max="100"/></div>
+        <div class="lb-form-field"><div class="lb-fld-lbl">Total Trades</div><input class="lb-fld-inp" id="fTrades" type="number" placeholder="120" min="1"/></div>
+        <div class="lb-form-field"><div class="lb-fld-lbl">Consistency (0–100)</div><input class="lb-fld-inp" id="fConsist" type="number" placeholder="85" min="0" max="100"/></div>
+      </div>
+      <div class="lb-err" id="lbErr"></div>
+      <button class="lb-add-btn" onclick="addLBEntry()">+ Add to Leaderboard</button>
+    </div>
+  </div>
+
+  <!-- ── TOP TRADERS TAB (Firebase live from top-traders.html) ── -->
+  <div class="comm-sec" id="comm-top-traders">
+    <div style="position:relative;overflow:hidden">
+      <div class="tt-ambient"></div>
+      <div style="position:relative;z-index:1;text-align:center;padding:20px 18px 14px">
+        <div class="tt-hero-eyebrow">🏆 Weekly Rankings</div>
+        <div class="tt-hero-ttl"><span class="gld">Top Traders</span></div>
+        <div class="tt-hero-sub">Best performing traders ranked by profit + win rate</div>
+      </div>
+    </div>
+    <div class="tt-stats">
+      <div class="tt-stat"><div class="tt-stat-v g dim" id="ttTotal">—</div><div class="tt-stat-l">Ranked</div></div>
+      <div class="tt-stat"><div class="tt-stat-v gr dim" id="ttTopProfit">—</div><div class="tt-stat-l">Top Profit</div></div>
+      <div class="tt-stat"><div class="tt-stat-v bl dim" id="ttAvgWR">—</div><div class="tt-stat-l">Avg Win Rate</div></div>
+    </div>
+    <div id="ttContent">
+      <div class="tt-empty">
+        <div class="tt-empty-orb">🚀</div>
+        <div class="tt-empty-ttl">Connecting to Firebase…</div>
+        <div class="tt-empty-sub">Live rankings will appear once connected</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── NEWS TAB ── -->
+  <div class="comm-sec" id="comm-news">
+    <a class="news-card" href="#" onclick="return false">
+      <div class="news-img" style="background:#1e2d45"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5b8fff" stroke-width="1.8"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></div>
+      <div><div class="news-ttl">Fed signals rate pause amid cooling inflation data</div><div class="news-mt"><span class="ntag macro">MACRO</span>Reuters · 1h ago</div></div>
+    </a>
+    <a class="news-card" href="#" onclick="return false">
+      <div class="news-img" style="background:#1a2a4a"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#a78bff" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/></svg></div>
+      <div><div class="news-ttl">BTC ETF inflows hit record $620M in a single day</div><div class="news-mt"><span class="ntag crypto">CRYPTO</span>CoinDesk · 3h ago</div></div>
+    </a>
+    <a class="news-card" href="#" onclick="return false">
+      <div class="news-img" style="background:#1a2e22"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#00c864" stroke-width="1.8"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
+      <div><div class="news-ttl">Gold retreats from record highs as dollar strengthens</div><div class="news-mt"><span class="ntag comm">COMMODITIES</span>Bloomberg · 5h ago</div></div>
+    </a>
+    <a class="news-card" href="#" onclick="return false">
+      <div class="news-img" style="background:#2a1e18"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ff7832" stroke-width="1.8"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/></svg></div>
+      <div><div class="news-ttl">Nifty50 breaks 22,500 as FII buying resumes strong</div><div class="news-mt"><span class="ntag india">INDIA</span>ET Markets · 6h ago</div></div>
+    </a>
+    <a class="news-card" href="#" onclick="return false">
+      <div class="news-img" style="background:#1a2a1a"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#00c87a" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><line x1="12" y1="6" x2="12" y2="18"/></svg></div>
+      <div><div class="news-ttl">ECB hints at June rate cut as inflation slows to 2.4%</div><div class="news-mt"><span class="ntag macro">MACRO</span>Financial Times · 8h ago</div></div>
+    </a>
+    <a class="news-card" href="#" onclick="return false">
+      <div class="news-img" style="background:#2a2a1a"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f5b731" stroke-width="1.8"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>
+      <div><div class="news-ttl">ETH surges 8% as Ethereum Foundation restores team</div><div class="news-mt"><span class="ntag crypto">CRYPTO</span>The Block · 10h ago</div></div>
+    </a>
+  </div>
+
+  <!-- ── CHAT ROOMS TAB ── -->
+  <div class="comm-sec" id="comm-chat-rooms">
+    <div class="room-item" onclick="navTo('chat')">
+      <span class="room-ico">💬</span>
+      <div class="room-info"><div class="room-nm">Traders Chat Room</div><div class="room-on"><span class="on-dot"></span>Live — Firebase powered</div></div>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--t4)" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+    </div>
+    <div class="room-item">
+      <span class="room-ico">₿</span>
+      <div class="room-info"><div class="room-nm">BTC Room</div><div class="room-on"><span class="on-dot"></span>312 online</div></div>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--t4)" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+    </div>
+    <div class="room-item">
+      <span class="room-ico">📈</span>
+      <div class="room-info"><div class="room-nm">Gold Room</div><div class="room-on"><span class="on-dot"></span>198 online</div></div>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--t4)" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+    </div>
+    <div class="room-item">
+      <span class="room-ico">€</span>
+      <div class="room-info"><div class="room-nm">Forex Room</div><div class="room-on">87 online</div></div>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--t4)" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+    </div>
+  </div>
+
+  <!-- ── CHALLENGES TAB ── -->
+  <div class="comm-sec" id="comm-challenges">
+    <div class="chal-card">
+      <div class="chal-badge">ACTIVE CHALLENGE</div>
+      <div class="chal-ttl">5-Day Breakout Hunt</div>
+      <div class="chal-desc">Post 3 breakout setups with entry, target and stop-loss. Most accurate trader wins Premium for 1 month.</div>
+      <div class="chal-prog"><div class="chal-bar"></div></div>
+      <div class="chal-meta"><span>Day 4 of 5</span><span style="color:var(--blue2)">218 participants</span></div>
+      <button class="chal-join-btn">Join Challenge</button>
+    </div>
+    <div style="height:12px"></div>
+    <div class="prizes-row">
+      <div class="prize-card"><div class="prize-ico">🥇</div><div class="prize-ttl">1st Place</div><div class="prize-sub">1 Month Premium</div></div>
+      <div class="prize-card"><div class="prize-ico">🥈</div><div class="prize-ttl">2nd Place</div><div class="prize-sub">Verified Badge</div></div>
+      <div class="prize-card"><div class="prize-ico">🥉</div><div class="prize-ttl">3rd Place</div><div class="prize-sub">Feature Post</div></div>
+    </div>
+    <div style="height:14px"></div>
+    <div style="background:linear-gradient(135deg,rgba(79,114,255,0.08),rgba(124,92,252,0.05));border:1px solid rgba(79,114,255,0.18);border-radius:var(--r-lg);margin:0 18px;padding:16px">
+      <div style="font-size:9px;color:var(--blue2);font-weight:700;letter-spacing:.8px;text-transform:uppercase;margin-bottom:8px">Upcoming Challenge</div>
+      <div style="font-family:var(--f-head);font-size:14px;font-weight:800;color:var(--t1);margin-bottom:5px">Weekly Risk Management Quiz</div>
+      <div style="font-size:11px;color:var(--t3);line-height:1.55">Answer 10 trading psychology questions. Top scorer gets 1-month Premium + leaderboard feature.</div>
+      <div style="margin-top:10px;font-size:9px;color:var(--t4)">Starts in: <span style="color:var(--amber);font-weight:700">2 days 14h</span></div>
+    </div>
+    <div style="height:14px"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     PAGE: CHAT (Firebase real-time)
+═══════════════════════════════════════════════════════════ -->
+<div id="pageChat" class="page">
+
+  <!-- Username modal -->
+  <div class="chat-modal-ov" id="usernameModal">
+    <div class="chat-mc">
+      <div class="chat-mc-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(79,114,255,0.9)" stroke-width="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+      <div class="chat-mc-ttl">Join the Trading Room</div>
+      <div class="chat-mc-sub">Set your trader username to start messaging live with other traders in real time.</div>
+      <div class="chat-fld-lbl">Your Username</div>
+      <input class="chat-fld-inp" id="usernameInput" type="text" placeholder="e.g. AlphaTrader99" maxlength="24" autocomplete="off"/>
+      <div class="chat-fld-hint">2–24 characters · letters, numbers, underscores only</div>
+      <div class="chat-fld-err" id="usernameErr"></div>
+      <button class="chat-mc-btn" onclick="handleJoin()">Enter Chat Room →</button>
+    </div>
+  </div>
+
+  <div class="chat-hdr">
+    <div class="chat-hdr-ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.9)" stroke-width="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+    <div><div class="chat-hdr-ttl">Traders Chat Room</div><div class="chat-hdr-sub" id="chatHdrSub">Initialising…</div></div>
+    <div class="conn-pill connecting" id="connPill"><span class="conn-dot"></span><span id="connTxt">CONNECTING</span></div>
+  </div>
+
+  <div class="user-strip" id="userStrip" style="display:none">
+    <div class="us-av" id="userStripAv"></div>
+    <span class="us-name" id="userStripName"></span>
+    <span class="us-badge">YOU</span>
+    <span class="us-change" onclick="changeUsername()">Change</span>
+  </div>
+
+  <div class="chat-load-ov" id="chatLoadOv">
+    <div class="chat-spinner"></div>
+    <div class="chat-load-txt" id="chatLoadTxt">Connecting to Firebase…</div>
+  </div>
+
+  <div class="chat-msgs" id="chatMsgsWrap" style="display:none;position:relative"></div>
+
+  <button class="new-msg-pill hidden" id="newMsgPill" onclick="chatScrollBottom(true)">
+    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>New messages
+  </button>
+
+  <div class="chat-typing" id="chatTypingBar"></div>
+
+  <div class="chat-inp-area">
+    <div class="chat-inp-wrap">
+      <input class="chat-inp" id="chatInput" type="text" placeholder="Message the trading room…" maxlength="500" autocomplete="off"
+        oninput="onChatInput()" onkeydown="onChatKey(event)" disabled/>
+      <span class="char-ct" id="chatCharCt"></span>
+    </div>
+    <button class="chat-send-btn" id="chatSendBtn" onclick="sendChatMsg()" disabled>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+    </button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     PAGE: MENU
+═══════════════════════════════════════════════════════════ -->
+<div id="pageMenu" class="page">
+  <div class="menu-topbar-row">
+    <div class="settings-icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg></div>
+  </div>
+  <div class="prof-card">
+    <div class="prof-card-top">
+      <div class="prof-left"><div class="prof-av">N</div><div><div class="prof-h2">nithynand92</div><span class="basic-badge">BASIC</span></div></div>
+      <span class="chev">›</span>
+    </div>
+    <div class="prof-stats">
+      <div class="ps-item"><span class="ps-num">0</span><span class="ps-lbl">Ideas</span></div>
+      <div class="ps-item"><span class="ps-num">0</span><span class="ps-lbl">Followers</span></div>
+      <div class="ps-item"><span class="ps-num">0</span><span class="ps-lbl">Following</span></div>
+    </div>
+  </div>
+  <div class="menu-grid">
+    <div class="menu-box" onclick="openSP('premiumPanel')">
+      <div class="menu-box-top"><svg class="box-icon" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg><span class="chev">›</span></div>
+      <h3>Premium Access</h3><p>Unlock advanced tools</p>
+    </div>
+    <div class="menu-box" onclick="openSP('invitePanel')">
+      <div class="menu-box-top"><svg class="box-icon" viewBox="0 0 24 24"><circle cx="9" cy="7" r="3"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/><path d="M16 11l2 2 4-4"/></svg><span class="chev">›</span></div>
+      <h3>Invite Friends</h3><p>Grow your network</p>
+    </div>
+  </div>
+  <div class="promo-box"><h3>Unlock market potential</h3><p>Trade smarter every day</p></div>
+  <div class="menu-list">
+    <div class="menu-list-item" onclick="openPopup('ratePopup')"><span class="list-ico"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></span><span class="list-lbl">Rate Us</span></div>
+    <div class="menu-div"></div>
+    <div class="menu-list-item" onclick="openSP('helpPanel')"><span class="list-ico"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span><span class="list-lbl">Help Center</span><span class="list-chev">›</span></div>
+    <div class="menu-div"></div>
+    <div class="menu-list-item" onclick="openSP('aboutPanel')"><span class="list-ico"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></span><span class="list-lbl">About</span><span class="list-chev">›</span></div>
+    <div class="menu-div"></div>
+  </div>
+</div>
+
+<!-- ─── SUB-PANEL: HELP ─── -->
+<div class="sub-panel" id="helpPanel">
+  <div class="sub-hdr"><button class="sub-back" onclick="closeSP('helpPanel')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg></button><span class="sub-title">Help Center</span></div>
+  <div class="help-search"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input type="text" placeholder="Search for help…"/></div>
+  <div class="sub-sec-lbl">FAQ</div>
+  <div class="help-card" onclick="toggleFaq(this)"><div class="faq-q">How do I read a candlestick chart?<span class="faq-arr">›</span></div><div class="faq-a">Candlestick charts show price movement using open, close, high and low values. Green means price moved up, red means price moved down.</div></div>
+  <div class="help-card" onclick="toggleFaq(this)"><div class="faq-q">What is backtesting?<span class="faq-arr">›</span></div><div class="faq-a">Backtesting means testing a trading strategy on past market data before using it live.</div></div>
+  <div class="help-card" onclick="toggleFaq(this)"><div class="faq-q">How do I set price alerts?<span class="faq-arr">›</span></div><div class="faq-a">Monitor target price levels and trigger alerts when the market reaches your selected value.</div></div>
+  <div class="help-card" onclick="toggleFaq(this)"><div class="faq-q">Is my data secure?<span class="faq-arr">›</span></div><div class="faq-a">TradeX AI uses secure storage and protected user access for account safety.</div></div>
+  <div class="sub-sec-lbl">Contact</div>
+  <div class="help-card contact-card">
+    <div class="contact-row"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg><div><div class="contact-lbl">Email</div><div class="contact-val">support@tradexai.app</div></div></div>
+    <div class="contact-div"></div>
+    <div class="contact-row"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><div><div class="contact-lbl">Live Chat</div><div class="contact-val">9am–6pm IST</div></div></div>
+  </div>
+  <div class="sub-sec-lbl">App Usage Guide</div>
+  <div class="guide-list">
+    <div class="guide-item"><div class="guide-num">01</div><div><div class="guide-ttl">Getting Started</div><div class="guide-sub-txt">Set up your profile and explore the dashboard</div></div></div>
+    <div class="guide-item"><div class="guide-num">02</div><div><div class="guide-ttl">Reading Charts</div><div class="guide-sub-txt">Use the Chart tab to view live market data</div></div></div>
+    <div class="guide-item"><div class="guide-num">03</div><div><div class="guide-ttl">Using Scanner</div><div class="guide-sub-txt">Explore tab gives real-time trend analysis</div></div></div>
+    <div class="guide-item"><div class="guide-num">04</div><div><div class="guide-ttl">Community</div><div class="guide-sub-txt">Share ideas and follow top traders</div></div></div>
+  </div>
+</div>
+
+<!-- ─── SUB-PANEL: ABOUT ─── -->
+<div class="sub-panel" id="aboutPanel">
+  <div class="sub-hdr"><button class="sub-back" onclick="closeSP('aboutPanel')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg></button><span class="sub-title">About</span></div>
+  <div class="about-logo-blk"><div class="about-logo-cir">TX</div><div class="about-app-name">TradeX AI</div><div class="about-ver">Version 1.0.0</div></div>
+  <div class="about-card"><p class="about-desc">TradeX AI helps users practice market analysis, test strategies, and improve trading discipline using real-time data and AI-powered insights.</p></div>
+  <div class="sub-sec-lbl">Features</div>
+  <div class="about-card">
+    <div class="feat-item"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--blue2)" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg><span>Smart chart learning</span></div>
+    <div class="feat-div"></div>
+    <div class="feat-item"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--blue2)" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/></svg><span>Strategy engine &amp; backtesting</span></div>
+    <div class="feat-div"></div>
+    <div class="feat-item"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--blue2)" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg><span>Live market scanner</span></div>
+    <div class="feat-div"></div>
+    <div class="feat-item"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--blue2)" stroke-width="2"><circle cx="9" cy="7" r="3"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/></svg><span>Community &amp; leaderboard</span></div>
+  </div>
+  <div class="sub-sec-lbl">Mission</div>
+  <div class="about-card"><p class="mission-txt">Make trading learning simple and practical.</p></div>
+</div>
+
+<!-- ─── SUB-PANEL: PREMIUM ─── -->
+<div class="sub-panel" id="premiumPanel">
+  <div class="sub-hdr"><button class="sub-back" onclick="closeSP('premiumPanel')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg></button><span class="sub-title">Premium Access</span></div>
+  <div class="prem-hero"><span class="prem-crown">★</span><div class="prem-ttl">Upgrade to Premium</div><div class="prem-sub">Unlock the full power of TradeX AI</div></div>
+  <div class="sub-sec-lbl">What you get</div>
+  <div class="pf-list">
+    <div class="pf-item"><div class="pf-ico"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--blue2)" stroke-width="2"><path d="M2 20h.01M7 20v-4"/><path d="M12 20v-8"/><path d="M17 20V8"/><path d="M22 4v16"/></svg></div><div><div class="pf-ttl">Advanced Tools</div><div class="pf-sub-txt">Pro indicators, multi-timeframe analysis, custom overlays</div></div></div>
+    <div class="pf-item"><div class="pf-ico"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--blue2)" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div><div><div class="pf-ttl">Faster Analysis</div><div class="pf-sub-txt">Real-time data with zero delay and faster rendering</div></div></div>
+    <div class="pf-item"><div class="pf-ico"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--blue2)" stroke-width="2"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/></svg></div><div><div class="pf-ttl">Premium Signals</div><div class="pf-sub-txt">Daily curated trade setups from top analysts</div></div></div>
+  </div>
+  <div class="price-card"><div class="price-row"><div><div class="price-lbl">Monthly</div><div class="price-val">₹499<span class="price-per">/mo</span></div></div><div class="price-badge">POPULAR</div></div></div>
+  <button class="action-btn">Get Premium Now</button>
+  <p class="prem-note">Cancel anytime. No hidden charges.</p>
+</div>
+
+<!-- ─── SUB-PANEL: INVITE ─── -->
+<div class="sub-panel" id="invitePanel">
+  <div class="sub-hdr"><button class="sub-back" onclick="closeSP('invitePanel')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg></button><span class="sub-title">Invite Friends</span></div>
+  <div class="invite-hero"><div class="inv-ico-wrap"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--blue2)" stroke-width="1.6"><circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="16" y1="11" x2="22" y2="11"/></svg></div><div class="inv-ttl">Grow your network</div><div class="inv-sub">Earn 30 days free Premium for every friend who joins using your code</div></div>
+  <div class="sub-sec-lbl">Your Invite Code</div>
+  <div class="inv-code-card"><span class="inv-code" id="inviteCode">NITX-9207</span><button class="copy-btn" onclick="copyInvCode()"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span id="copyLbl">Copy</span></button></div>
+  <div class="sub-sec-lbl">Share via</div>
+  <div class="share-grid">
+    <div class="share-item" onclick="shareVia('WhatsApp')"><div class="share-ico si-green"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg></div><span>WhatsApp</span></div>
+    <div class="share-item" onclick="shareVia('Telegram')"><div class="share-ico si-blue"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#29b6f6" stroke-width="1.8"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></div><span>Telegram</span></div>
+    <div class="share-item" onclick="shareVia('Twitter')"><div class="share-ico si-sky"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#64b5f6" stroke-width="1.8"><path d="M23 3a10.9 10.9 0 0 1-3.14 1.53A4.48 4.48 0 0 0 16 4a4.48 4.48 0 0 0-4 6.61 12.05 12.05 0 0 1-8-4s-4 9 5 13a11.64 11.64 0 0 1-7 2c9 5 20 0 20-11.5a4.5 4.5 0 0 0-.08-.83A7.72 7.72 0 0 0 23 3z"/></svg></div><span>Twitter</span></div>
+    <div class="share-item" onclick="shareVia('More')"><div class="share-ico si-gray"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--t3)" stroke-width="1.8"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg></div><span>More</span></div>
+  </div>
+  <div class="inv-reward-card"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="1.8"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg><div><div class="rwd-ttl">Earn 30 days free Premium</div><div class="rwd-sub">for every friend who joins using your code</div></div></div>
+</div>
+
+<!-- ─── RATE POPUP ─── -->
+<div class="popup-ov hidden" id="ratePopup" onclick="if(event.target===this)closePopup('ratePopup')">
+  <div class="popup-box">
+    <div class="popup-hdr"><span class="popup-ttl">Rate TradeX AI</span><button class="popup-cls" onclick="closePopup('ratePopup')">✕</button></div>
+    <p class="popup-sub">How would you rate your experience?</p>
+    <div class="star-row"><span class="star" data-v="1" onclick="setRating(1)">★</span><span class="star" data-v="2" onclick="setRating(2)">★</span><span class="star" data-v="3" onclick="setRating(3)">★</span><span class="star" data-v="4" onclick="setRating(4)">★</span><span class="star" data-v="5" onclick="setRating(5)">★</span></div>
+    <p id="rateMsg" class="rate-msg"></p>
+    <button class="action-btn" onclick="submitRating()" style="margin:0;width:100%;padding:12px">Submit Rating</button>
+  </div>
+</div>
+
+<!-- ─── TOAST STACK ─── -->
+<div class="toast-stack" id="toastStack"></div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     BOTTOM NAV
+═══════════════════════════════════════════════════════════ -->
+<nav class="bottom-nav">
+  <button class="nav-btn active" id="nav-home" onclick="navTo('home',this)">
+    <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg><span>Home</span>
+  </button>
+  <button class="nav-btn" id="nav-explore" onclick="navTo('explore',this)">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg><span>Explore</span>
+  </button>
+  <button class="nav-btn" id="nav-chart" onclick="navTo('chart',this)">
+    <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg><span>Trade</span>
+  </button>
+  <button class="nav-btn" id="nav-community" onclick="navTo('community',this)">
+    <svg viewBox="0 0 24 24"><circle cx="9" cy="7" r="3"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/><circle cx="18" cy="7" r="2"/><path d="M21 21v-1a3 3 0 0 0-2-2.83"/></svg><span>Community</span>
+  </button>
+  <button class="nav-btn" id="nav-chat" onclick="navTo('chat',this)">
+    <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span>Chat</span>
+  </button>
+  <button class="nav-btn" id="nav-menu" onclick="navTo('menu',this)">
+    <svg viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg><span>Menu</span>
+  </button>
+</nav>
+
+<script src="script.js"></script>
+<script src="market-data.js"></script>
+<script type="=module"src="script.js"></script>
+<button id="googleLoginBtn">Continue with Google</button>
+</body>
+</html>

@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Top Traders — TradeXpro</title>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet"/>
+<style>
+/* ═══════════════════════════════════════
+   RESET & TOKENS
+═══════════════════════════════════════ */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root{
+  --bg:         #060a12;
+  --bg2:        #0a1120;
+  --card:       #0d1626;
+  --card2:      #111e30;
+  --border:     rgba(255,255,255,0.07);
+  --border-hi:  rgba(255,255,255,0.12);
+  --gold:       #f0b429;
+  --gold-glow:  rgba(240,180,41,0.2);
+  --silver:     #94a3b8;
+  --bronze:     #b87333;
+  --green:      #10d47e;
+  --green-dim:  rgba(16,212,126,0.12);
+  --blue:       #3b82f6;
+  --blue-dim:   rgba(59,130,246,0.12);
+  --red:        #f43f5e;
+  --text:       #e2e8f0;
+  --muted:      #64748b;
+  --dim:        #334155;
+  --display:    'Outfit', sans-serif;
+  --mono:       'JetBrains Mono', monospace;
+}
+
+html,body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:var(--display);
+  min-height:100vh;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* ═══════════════════════════════════════
+   SCROLLBAR
+═══════════════════════════════════════ */
+::-webkit-scrollbar{width:3px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.08);border-radius:4px}
+
+/* ═══════════════════════════════════════
+   PANEL SHELL
+═══════════════════════════════════════ */
+#topTradersPanel{
+  display:flex;
+  flex-direction:column;
+  max-width:480px;
+  margin:0 auto;
+  min-height:100vh;
+  position:relative;
+  overflow-x:hidden;
+}
+
+/* ═══════════════════════════════════════
+   BACKGROUND AMBIENT GLOW
+═══════════════════════════════════════ */
+.tt-ambient{
+  position:fixed;
+  top:0;left:50%;transform:translateX(-50%);
+  width:600px;height:300px;
+  background:radial-gradient(ellipse at 50% 0%, rgba(59,130,246,0.07) 0%, transparent 65%);
+  pointer-events:none;z-index:0;
+}
+
+/* ═══════════════════════════════════════
+   STICKY HEADER
+═══════════════════════════════════════ */
+.tt-header{
+  position:sticky;top:0;z-index:30;
+  display:flex;align-items:center;gap:10px;
+  padding:13px 16px 12px;
+  background:rgba(6,10,18,0.85);
+  backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--border);
+}
+.tt-back{
+  width:32px;height:32px;border-radius:10px;
+  background:rgba(255,255,255,0.05);
+  border:1px solid var(--border);
+  display:flex;align-items:center;justify-content:center;
+  color:var(--muted);cursor:pointer;flex-shrink:0;
+  transition:all .15s;
+}
+.tt-back:hover{background:rgba(255,255,255,0.09);color:var(--text);}
+.tt-header-label{
+  flex:1;font-size:16px;font-weight:700;
+  color:#fff;letter-spacing:-.3px;
+}
+.tt-live{
+  display:flex;align-items:center;gap:5px;
+  background:rgba(16,212,126,0.08);
+  border:1px solid rgba(16,212,126,0.18);
+  border-radius:20px;padding:4px 10px;
+}
+.tt-live-dot{
+  width:5px;height:5px;border-radius:50%;
+  background:var(--green);
+  box-shadow:0 0 8px var(--green);
+  animation:livePulse 1.6s infinite;
+}
+@keyframes livePulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.3;transform:scale(.7)}}
+.tt-live-txt{font-size:9px;font-weight:700;color:var(--green);letter-spacing:.9px;}
+
+/* ═══════════════════════════════════════
+   HERO SECTION
+═══════════════════════════════════════ */
+.tt-hero{
+  position:relative;z-index:1;
+  padding:26px 20px 18px;
+  text-align:center;
+}
+.tt-hero-eyebrow{
+  display:inline-flex;align-items:center;gap:6px;
+  background:rgba(240,180,41,0.08);
+  border:1px solid rgba(240,180,41,0.18);
+  border-radius:20px;padding:4px 12px;
+  font-size:10px;font-weight:700;color:var(--gold);
+  letter-spacing:.7px;text-transform:uppercase;
+  margin-bottom:10px;
+}
+.tt-hero-title{
+  font-size:30px;font-weight:900;
+  color:#fff;letter-spacing:-.8px;
+  line-height:1.1;margin-bottom:7px;
+}
+.tt-hero-title .gold-txt{
+  background:linear-gradient(135deg,#fbbf24,#f59e0b,#d97706);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+}
+.tt-hero-sub{
+  font-size:12px;color:var(--muted);
+  line-height:1.55;max-width:260px;margin:0 auto;
+}
+
+/* ═══════════════════════════════════════
+   FORMULA CARD
+═══════════════════════════════════════ */
+.tt-formula{
+  margin:0 14px 14px;
+  background:linear-gradient(135deg,rgba(59,130,246,0.06),rgba(16,212,126,0.04));
+  border:1px solid rgba(59,130,246,0.15);
+  border-radius:13px;
+  padding:11px 14px;
+  display:flex;align-items:center;gap:10px;
+  position:relative;z-index:1;
+}
+.tt-formula-icon{
+  width:32px;height:32px;border-radius:9px;
+  background:rgba(59,130,246,0.12);
+  display:flex;align-items:center;justify-content:center;
+  font-size:15px;flex-shrink:0;
+}
+.tt-formula-body{font-size:11px;color:var(--muted);line-height:1.6;}
+.tt-formula-body strong{font-weight:700;color:var(--text);}
+.tt-formula-body .kw-green{color:var(--green);font-weight:700;}
+.tt-formula-body .kw-blue {color:var(--blue); font-weight:700;}
+.tt-formula-note{font-size:9px;color:var(--dim);margin-top:1px;}
+
+/* ═══════════════════════════════════════
+   STATS STRIP
+═══════════════════════════════════════ */
+.tt-stats{
+  display:grid;grid-template-columns:repeat(3,1fr);
+  gap:8px;padding:0 14px 14px;
+  position:relative;z-index:1;
+}
+.tt-stat{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:13px;padding:10px 8px 9px;
+  text-align:center;
+  transition:border-color .2s;
+}
+.tt-stat:hover{border-color:var(--border-hi);}
+.tt-stat-val{
+  font-family:var(--mono);
+  font-size:17px;font-weight:700;color:#fff;
+  transition:color .4s;
+}
+.tt-stat-val.g{color:var(--gold);}
+.tt-stat-val.gr{color:var(--green);}
+.tt-stat-val.bl{color:var(--blue);}
+.tt-stat-val.dim{color:var(--muted);font-size:12px;font-family:var(--display);}
+.tt-stat-lbl{font-size:8.5px;color:var(--muted);margin-top:3px;letter-spacing:.5px;text-transform:uppercase;font-weight:600;}
+
+/* ═══════════════════════════════════════
+   SECTION LABEL
+═══════════════════════════════════════ */
+.tt-sec{
+  display:flex;align-items:center;gap:7px;
+  padding:2px 14px 9px;
+  position:relative;z-index:1;
+}
+.tt-sec-line{flex:1;height:1px;background:var(--border);}
+.tt-sec-txt{font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--dim);}
+
+/* ═══════════════════════════════════════
+   PODIUM (TOP 3)
+═══════════════════════════════════════ */
+.tt-podium{
+  display:grid;grid-template-columns:1fr 1.08fr 1fr;
+  gap:8px;padding:0 10px 16px;
+  align-items:end;position:relative;z-index:1;
+}
+
+.tt-pod-card{
+  border-radius:16px;padding:14px 10px 13px;
+  text-align:center;position:relative;overflow:hidden;
+  border:1px solid var(--border);
+  transition:transform .25s,box-shadow .25s;
+  cursor:default;
+}
+.tt-pod-card:hover{transform:translateY(-4px);}
+
+.tt-pod-card.p1{
+  background:linear-gradient(180deg,rgba(30,20,5,0.9),var(--card));
+  border-color:rgba(240,180,41,0.3);
+  box-shadow:0 4px 32px rgba(240,180,41,0.1);
+  min-height:158px;
+}
+.tt-pod-card.p2{
+  background:linear-gradient(180deg,rgba(10,18,30,0.9),var(--card));
+  border-color:rgba(148,163,184,0.22);
+  box-shadow:0 4px 20px rgba(148,163,184,0.06);
+  min-height:132px;
+}
+.tt-pod-card.p3{
+  background:linear-gradient(180deg,rgba(20,12,5,0.9),var(--card));
+  border-color:rgba(184,115,51,0.22);
+  box-shadow:0 4px 20px rgba(184,115,51,0.06);
+  min-height:118px;
+}
+
+/* top glow line */
+.tt-pod-card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:2px;border-radius:16px 16px 0 0;
+}
+.p1::before{background:linear-gradient(90deg,transparent,var(--gold),transparent);}
+.p2::before{background:linear-gradient(90deg,transparent,var(--silver),transparent);}
+.p3::before{background:linear-gradient(90deg,transparent,var(--bronze),transparent);}
+
+/* shimmer overlay */
+.tt-pod-card::after{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(135deg,rgba(255,255,255,0.02) 0%,transparent 50%);
+  pointer-events:none;
+}
+
+.tt-pod-medal{font-size:20px;display:block;margin-bottom:5px;}
+.tt-pod-av{
+  width:44px;height:44px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:17px;font-weight:800;color:#fff;
+  margin:0 auto 8px;
+  border:2px solid transparent;
+  font-family:var(--display);
+}
+.p1 .tt-pod-av{background:linear-gradient(135deg,#3d2800,#7a5000);border-color:var(--gold);}
+.p2 .tt-pod-av{background:linear-gradient(135deg,#151f2e,#243347);border-color:var(--silver);}
+.p3 .tt-pod-av{background:linear-gradient(135deg,#2a1500,#5c3010);border-color:var(--bronze);}
+
+.tt-pod-badge{
+  position:absolute;top:8px;right:8px;
+  width:19px;height:19px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:9px;font-weight:800;
+}
+.p1 .tt-pod-badge{background:var(--gold);color:#000;}
+.p2 .tt-pod-badge{background:var(--silver);color:#000;}
+.p3 .tt-pod-badge{background:var(--bronze);color:#fff;}
+
+.tt-pod-name{font-size:13px;font-weight:700;color:#fff;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.tt-pod-profit{
+  font-family:var(--mono);font-size:14px;font-weight:700;
+  color:var(--green);margin-bottom:2px;
+  transition:transform .3s;
+}
+.tt-pod-wr{font-size:10px;color:var(--muted);}
+.tt-pod-score{font-size:8.5px;color:var(--dim);margin-top:3px;letter-spacing:.3px;}
+.tt-me-tag{
+  display:inline-block;font-size:8px;font-weight:700;
+  color:var(--blue);background:var(--blue-dim);
+  padding:1px 5px;border-radius:6px;margin-left:3px;
+  vertical-align:middle;letter-spacing:.3px;
+}
+
+/* ═══════════════════════════════════════
+   LEADERBOARD LIST
+═══════════════════════════════════════ */
+.tt-list{
+  padding:0 10px 10px;
+  display:flex;flex-direction:column;gap:5px;
+  position:relative;z-index:1;
+}
+
+.tt-row{
+  display:grid;
+  grid-template-columns:38px 1fr auto auto;
+  align-items:center;gap:0 8px;
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:12px;padding:10px 12px;
+  position:relative;overflow:hidden;
+  transition:border-color .2s,transform .2s,background .2s;
+  cursor:default;
+}
+.tt-row:hover{
+  border-color:var(--border-hi);
+  background:var(--card2);
+  transform:translateX(3px);
+}
+.tt-row.me{
+  border-color:rgba(59,130,246,0.35);
+  background:rgba(59,130,246,0.05);
+  box-shadow:0 0 20px rgba(59,130,246,0.07);
+}
+/* left accent bar */
+.tt-row::before{
+  content:'';position:absolute;left:0;top:0;bottom:0;
+  width:2px;border-radius:0;opacity:0;
+  transition:opacity .2s;
+  background:linear-gradient(180deg,var(--blue),transparent);
+}
+.tt-row:hover::before,.tt-row.me::before{opacity:1;}
+
+.tt-row.flash-up  {animation:flashG .65s ease;}
+.tt-row.flash-dn  {animation:flashR .65s ease;}
+@keyframes flashG{0%,100%{background:var(--card)}45%{background:rgba(16,212,126,0.08)}}
+@keyframes flashR{0%,100%{background:var(--card)}45%{background:rgba(244,63,94,0.08)}}
+
+.tt-rk{
+  font-family:var(--mono);font-size:14px;font-weight:700;
+  color:var(--dim);text-align:center;
+}
+.tt-row-info{min-width:0;}
+.tt-row-name{
+  font-size:13px;font-weight:700;color:#fff;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  display:flex;align-items:center;gap:4px;
+}
+.tt-row-sub{font-size:9.5px;color:var(--muted);margin-top:1px;}
+.tt-row-profit{
+  font-family:var(--mono);font-size:13px;font-weight:700;
+  color:var(--green);text-align:right;white-space:nowrap;
+  transition:color .3s;
+}
+.tt-row-wr{
+  font-size:10px;color:var(--muted);text-align:right;
+  white-space:nowrap;min-width:52px;
+}
+.tt-row-wr span{color:var(--text);font-weight:600;}
+
+/* trend arrows */
+.arr-up{color:var(--green);font-size:9px;margin-left:2px;}
+.arr-dn{color:var(--red);  font-size:9px;margin-left:2px;}
+
+/* score pill */
+.tt-score{
+  display:inline-block;font-size:8px;font-weight:700;
+  padding:1px 6px;border-radius:8px;
+  background:rgba(59,130,246,0.1);color:rgba(59,130,246,0.75);
+  letter-spacing:.3px;margin-left:4px;vertical-align:middle;
+}
+
+/* medal badge inline */
+.tt-medal-inline{font-size:12px;flex-shrink:0;}
+
+/* YOU badge */
+.tt-you{
+  font-size:8px;font-weight:800;
+  color:var(--blue);background:var(--blue-dim);
+  padding:1px 5px;border-radius:6px;letter-spacing:.3px;flex-shrink:0;
+}
+
+/* ═══════════════════════════════════════
+   EMPTY STATE
+═══════════════════════════════════════ */
+.tt-empty{
+  display:flex;flex-direction:column;align-items:center;
+  padding:44px 24px 32px;text-align:center;
+  position:relative;z-index:1;
+}
+.tt-empty-orb{
+  width:72px;height:72px;border-radius:50%;
+  background:linear-gradient(135deg,rgba(59,130,246,0.15),rgba(16,212,126,0.1));
+  border:1px solid rgba(59,130,246,0.2);
+  display:flex;align-items:center;justify-content:center;
+  font-size:30px;margin-bottom:14px;
+  box-shadow:0 0 30px rgba(59,130,246,0.1);
+  animation:orbFloat 3s ease-in-out infinite;
+}
+@keyframes orbFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+.tt-empty-title{
+  font-size:18px;font-weight:800;color:#fff;
+  letter-spacing:-.3px;margin-bottom:7px;
+}
+.tt-empty-sub{font-size:12px;color:var(--muted);line-height:1.6;max-width:230px;margin-bottom:20px;}
+.tt-cta{
+  display:flex;align-items:center;gap:8px;
+  background:linear-gradient(135deg,var(--blue),#2563eb);
+  border:none;border-radius:12px;
+  padding:11px 22px;color:#fff;
+  font-family:var(--display);font-size:13px;font-weight:700;
+  cursor:pointer;letter-spacing:.2px;
+  box-shadow:0 4px 20px rgba(59,130,246,0.3);
+  transition:opacity .15s,transform .15s;
+}
+.tt-cta:active{opacity:.85;transform:scale(.97);}
+
+/* ═══════════════════════════════════════
+   PODIUM SKELETON
+═══════════════════════════════════════ */
+.sk{
+  background:rgba(255,255,255,0.04);border-radius:4px;
+  animation:skPulse 1.4s infinite ease-in-out;
+}
+@keyframes skPulse{0%,100%{opacity:.35}50%{opacity:.8}}
+
+/* ═══════════════════════════════════════
+   CTA STRIP (bottom, always visible)
+═══════════════════════════════════════ */
+.tt-cta-strip{
+  margin:10px 14px 18px;
+  display:grid;grid-template-columns:1fr 1fr;
+  gap:8px;position:relative;z-index:1;
+}
+.tt-cta-btn{
+  height:40px;border-radius:11px;border:none;
+  font-family:var(--display);font-size:12px;font-weight:700;
+  cursor:pointer;letter-spacing:.2px;
+  transition:opacity .15s,transform .15s;
+  display:flex;align-items:center;justify-content:center;gap:6px;
+}
+.tt-cta-btn:active{opacity:.85;transform:scale(.97);}
+.tt-cta-btn.primary{
+  background:linear-gradient(135deg,var(--blue),#1d4ed8);
+  color:#fff;
+  box-shadow:0 4px 18px rgba(59,130,246,0.25);
+}
+.tt-cta-btn.secondary{
+  background:var(--card);
+  border:1px solid var(--border-hi);
+  color:var(--text);
+}
+
+/* ═══════════════════════════════════════
+   FOOTER TICKER
+═══════════════════════════════════════ */
+.tt-ticker{
+  display:flex;align-items:center;gap:7px;
+  padding:9px 14px 14px;
+  font-size:10px;color:var(--dim);
+  border-top:1px solid var(--border);
+  position:relative;z-index:1;
+}
+.tt-ticker-dot{
+  width:5px;height:5px;border-radius:50%;flex-shrink:0;
+  background:var(--blue);box-shadow:0 0 5px var(--blue);
+  animation:livePulse 1.4s infinite;
+}
+
+/* ═══════════════════════════════════════
+   ENTRANCE ANIMATIONS
+═══════════════════════════════════════ */
+.fade-in{animation:fadeIn .4s ease both;}
+.rise   {animation:riseUp .45s ease both;}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes riseUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+</style>
+</head>
+<body>
+<div id="topTradersPanel">
+
+  <div class="tt-ambient"></div>
+
+  <!-- HEADER -->
+  <div class="tt-header">
+    <button class="tt-back" onclick="history.back()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="15 18 9 12 15 6"/></svg>
+    </button>
+    <div class="tt-header-label">Top Traders</div>
+    <div class="tt-live"><span class="tt-live-dot"></span><span class="tt-live-txt">LIVE</span></div>
+  </div>
+
+  <!-- HERO -->
+  <div class="tt-hero fade-in">
+    <div class="tt-hero-eyebrow">🏆 Weekly Rankings</div>
+    <div class="tt-hero-title"><span class="gold-txt">Top Traders</span></div>
+    <div class="tt-hero-sub">Congratulations to the best performing traders</div>
+  </div>
+
+  <!-- FORMULA -->
+  <div class="tt-formula rise" style="animation-delay:.05s">
+    <div class="tt-formula-icon">⚡</div>
+    <div>
+      <div class="tt-formula-body">
+        Score = <span class="kw-green">Profit</span> + (<span class="kw-blue">Win Rate</span> × 10)
+      </div>
+      <div class="tt-formula-note">Only traders with Profit &gt; 0 qualify · Sorted highest score first</div>
+    </div>
+  </div>
+
+  <!-- STATS -->
+  <div class="tt-stats rise" style="animation-delay:.1s" id="ttStats">
+    <div class="tt-stat">
+      <div class="tt-stat-val g dim" id="ttTotal">—</div>
+      <div class="tt-stat-lbl">Ranked</div>
+    </div>
+    <div class="tt-stat">
+      <div class="tt-stat-val gr dim" id="ttTopProfit">—</div>
+      <div class="tt-stat-lbl">Top Profit</div>
+    </div>
+    <div class="tt-stat">
+      <div class="tt-stat-val bl dim" id="ttAvgWR">—</div>
+      <div class="tt-stat-lbl">Avg Win Rate</div>
+    </div>
+  </div>
+
+  <!-- CONTENT (podium + list OR empty) -->
+  <div id="ttContent"></div>
+
+  <!-- CTA STRIP -->
+  <div class="tt-cta-strip rise" style="animation-delay:.25s">
+    <button class="tt-cta-btn primary" onclick="onStartTrading()">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      Start Trading
+    </button>
+    <button class="tt-cta-btn secondary" onclick="onViewMarkets()">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+      View Markets
+    </button>
+  </div>
+
+  <!-- TICKER -->
+  <div class="tt-ticker">
+    <span class="tt-ticker-dot"></span>
+    <span id="ttTicker">Connecting to live data…</span>
+  </div>
+
+</div><!-- /#topTradersPanel -->
+
+<script>
+/* ════════════════════════════════════════
+   FIREBASE — replace with your credentials
+════════════════════════════════════════ */
+var firebaseConfig = {
+  apiKey:      "AIzaSyAy_rt_MlK-zl_8agMHxz8ZGsh2B3XVZKU",
+  authDomain:  "tradexpro-213e8.firebaseapp.com",
+  databaseURL: "https://tradexpro-213e8-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId:   "tradexpro-213e8"
+};
+if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+var db = firebase.database();
+
+/* ════════════════════════════════════════
+   CURRENT USER — swap with real auth uid
+════════════════════════════════════════ */
+var ME = 'nithynand92';
+
+/* ════════════════════════════════════════
+   STATE
+════════════════════════════════════════ */
+var prevRanks = {};
+var isFirst   = true;
+
+/* ════════════════════════════════════════
+   STEP 1 — LISTEN
+   db.ref('users') fires on every child write.
+   No polling. No manual refresh.
+════════════════════════════════════════ */
+function listen() {
+  db.ref('users').on('value', function(snap) {
+    var raw = snap.val();
+    var ranked = raw ? computeRankings(raw) : [];
+    render(ranked);
+    renderStats(ranked);
+    document.getElementById('ttTicker').textContent =
+      ranked.length
+        ? 'Updated ' + new Date().toLocaleTimeString() + ' · ' + ranked.length + ' qualified trader' + (ranked.length !== 1 ? 's' : '')
+        : 'Waiting for qualified traders…';
+    isFirst = false;
+  }, function(err) {
+    console.error('[TT]', err.message);
+    document.getElementById('ttTicker').textContent = 'Connection error — ' + err.message;
+  });
+}
+
+/* ════════════════════════════════════════
+   STEP 2 — ALGORITHM
+   Input : raw users object from Firebase
+   Output: sorted, filtered, top-10 array
+════════════════════════════════════════ */
+function computeRankings(raw) {
+  var out = [];
+  Object.keys(raw).forEach(function(uid) {
+    var u = raw[uid];
+    if (!u || !u.name) return;                   // skip invalid entries
+    var profit  = Number(u.profit)  || 0;
+    var winRate = Number(u.winRate) || 0;
+    var trades  = Number(u.trades)  || 0;
+    if (profit <= 0) return;                     // QUALIFICATION: profit > 0 only
+    var score = profit + (winRate * 10);         // RANKING FORMULA
+    out.push({ id:uid, name:u.name, profit:profit, winRate:winRate, trades:trades, score:score, avatar:initials(u.name) });
+  });
+  out.sort(function(a,b){ return b.score - a.score; }); // highest score first
+  return out.slice(0, 10);                              // top 10 only
+}
+
+/* ════════════════════════════════════════
+   STEP 3 — RENDER STATS
+════════════════════════════════════════ */
+function renderStats(ranked) {
+  var tEl  = document.getElementById('ttTotal');
+  var pEl  = document.getElementById('ttTopProfit');
+  var wEl  = document.getElementById('ttAvgWR');
+
+  if (!ranked.length) {
+    tEl.textContent = '—';  tEl.className = 'tt-stat-val g dim';
+    pEl.textContent = 'Waiting…'; pEl.className = 'tt-stat-val gr dim';
+    wEl.textContent = 'Waiting…'; wEl.className = 'tt-stat-val bl dim';
+    return;
+  }
+
+  var avgWR = ranked.reduce(function(s,u){return s+u.winRate;},0) / ranked.length;
+  tEl.textContent = ranked.length;         tEl.className = 'tt-stat-val g';
+  pEl.textContent = '₹'+fmtNum(ranked[0].profit); pEl.className = 'tt-stat-val gr';
+  wEl.textContent = avgWR.toFixed(1)+'%'; wEl.className = 'tt-stat-val bl';
+}
+
+/* ════════════════════════════════════════
+   STEP 4 — RENDER CONTENT
+════════════════════════════════════════ */
+function render(ranked) {
+  var wrap = document.getElementById('ttContent');
+
+  if (!ranked.length) {
+    wrap.innerHTML = buildEmpty();
+    prevRanks = {};
+    return;
+  }
+
+  var newRanks = {};
+  ranked.forEach(function(u,i){ newRanks[u.id] = i+1; });
+
+  var html = '';
+
+  /* PODIUM */
+  html += '<div class="tt-sec"><div class="tt-sec-line"></div><div class="tt-sec-txt">🥇 Podium</div><div class="tt-sec-line"></div></div>';
+  html += buildPodium(ranked);
+
+  /* LIST */
+  if (ranked.length > 3) {
+    html += '<div class="tt-sec" style="margin-top:2px"><div class="tt-sec-line"></div><div class="tt-sec-txt">📊 Rankings</div><div class="tt-sec-line"></div></div>';
+    html += '<div class="tt-list">' + buildList(ranked, newRanks) + '</div>';
+  }
+
+  wrap.innerHTML = html;
+
+  /* Apply flash animations after DOM update */
+  ranked.slice(3).forEach(function(u,i){
+    var rank = i+4;
+    var prev = prevRanks[u.id];
+    if (!prev || prev === rank) return;
+    var row = document.getElementById('row-'+u.id);
+    if (!row) return;
+    var cls = prev > rank ? 'flash-up' : 'flash-dn';
+    row.classList.add(cls);
+    setTimeout(function(){ row.classList.remove(cls); }, 700);
+  });
+
+  prevRanks = newRanks;
+}
+
+/* ════════════════════════════════════════
+   BUILD — EMPTY STATE
+════════════════════════════════════════ */
+function buildEmpty() {
+  return '<div class="tt-empty rise">' +
+    '<div class="tt-empty-orb">🚀</div>' +
+    '<div class="tt-empty-title">No champions yet</div>' +
+    '<div class="tt-empty-sub">Be the first to dominate — make profitable trades to claim your rank 🚀</div>' +
+    '<button class="tt-cta" onclick="onStartTrading()">' +
+      '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>' +
+      'Start Trading Now' +
+    '</button>' +
+  '</div>';
+}
+
+/* ════════════════════════════════════════
+   BUILD — PODIUM (TOP 3)
+   Visual column order: 2nd | 1st | 3rd
+════════════════════════════════════════ */
+var P_CLS    = ['p2','p1','p3'];
+var P_MEDALS = ['🥈','👑','🥉'];
+var P_RANKS  = ['2','1','3'];
+var P_ORDER  = [1, 0, 2];      /* index into ranked[] */
+var P_DELAYS = ['.12s','.04s','.20s'];
+
+function buildPodium(ranked) {
+  var html = '<div class="tt-podium">';
+  P_ORDER.forEach(function(di, ci) {
+    var t = ranked[di];
+    if (!t) {
+      html += '<div class="tt-pod-card '+P_CLS[ci]+'" style="opacity:.25;min-height:110px"></div>';
+      return;
+    }
+    var isMe = t.id === ME;
+    html +=
+      '<div class="tt-pod-card '+P_CLS[ci]+' rise" style="animation-delay:'+P_DELAYS[ci]+'">' +
+        '<div class="tt-pod-badge">'+P_RANKS[ci]+'</div>' +
+        '<span class="tt-pod-medal">'+P_MEDALS[ci]+'</span>' +
+        '<div class="tt-pod-av">'+esc(t.avatar)+'</div>' +
+        '<div class="tt-pod-name">'+esc(t.name)+(isMe?'<span class="tt-me-tag">YOU</span>':'')+'</div>' +
+        '<div class="tt-pod-profit">+₹'+fmtNum(t.profit)+'</div>' +
+        '<div class="tt-pod-wr">WR '+t.winRate.toFixed(1)+'%</div>' +
+        '<div class="tt-pod-score">Score '+Math.round(t.score).toLocaleString()+'</div>' +
+      '</div>';
+  });
+  html += '</div>';
+  return html;
+}
+
+/* ════════════════════════════════════════
+   BUILD — LEADERBOARD LIST (#4 onward)
+════════════════════════════════════════ */
+var INLINE_MEDALS = ['','','','🏅'];   /* used for rank 4+ if desired — left blank */
+
+function buildList(ranked, newRanks) {
+  var html = '';
+  ranked.slice(3).forEach(function(u,i) {
+    var rank = i + 4;
+    var prev = prevRanks[u.id];
+    var isMe = u.id === ME;
+
+    var trend = '';
+    if (prev && prev > rank) trend = '<span class="arr-up">▲</span>';
+    if (prev && prev < rank) trend = '<span class="arr-dn">▼</span>';
+
+    html +=
+      '<div class="tt-row'+(isMe?' me':'')+'" id="row-'+u.id+'" style="animation-delay:'+(i*.04)+'s">' +
+        '<div class="tt-rk">'+rank+'</div>' +
+        '<div class="tt-row-info">' +
+          '<div class="tt-row-name">' +
+            esc(u.name)+trend+
+            '<span class="tt-score">'+Math.round(u.score).toLocaleString()+'</span>' +
+            (isMe ? '<span class="tt-you">YOU</span>' : '') +
+          '</div>' +
+          '<div class="tt-row-sub">'+u.trades+' trades</div>' +
+        '</div>' +
+        '<div class="tt-row-profit">+₹'+fmtNum(u.profit)+'</div>' +
+        '<div class="tt-row-wr">WR <span>'+u.winRate.toFixed(1)+'%</span></div>' +
+      '</div>';
+  });
+  return html;
+}
+
+/* ════════════════════════════════════════
+   CTA HANDLERS — wire to your navigation
+════════════════════════════════════════ */
+function onStartTrading() {
+  /* Replace with your routing logic, e.g.: openPanel('chartPanel') */
+  alert('Navigate to trading screen');
+}
+function onViewMarkets() {
+  /* Replace with your routing logic, e.g.: openPanel('marketsPanel') */
+  alert('Navigate to markets screen');
+}
+
+/* ════════════════════════════════════════
+   UTILITIES
+════════════════════════════════════════ */
+function initials(name) {
+  var p = String(name).trim().split(/\s+/);
+  return p.length >= 2
+    ? (p[0][0] + p[1][0]).toUpperCase()
+    : String(name).substring(0,2).toUpperCase();
+}
+
+function fmtNum(n) {
+  if (n >= 10000000) return (n/10000000).toFixed(2)+'Cr';
+  if (n >= 100000)   return (n/100000).toFixed(2)+'L';
+  if (n >= 1000)     return (n/1000).toFixed(1)+'K';
+  return Math.round(n).toString();
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+/* ════════════════════════════════════════
+   BOOT
+════════════════════════════════════════ */
+document.addEventListener('DOMContentLoaded', listen);
+</script>
+</body>
+</html>

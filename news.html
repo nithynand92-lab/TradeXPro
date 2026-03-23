@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TradeXAI — Live Forex News</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg0:#06070d;--bg1:#0a0b14;--bg2:#0f1020;--bg3:#151727;--bg4:#1a1c2e;
+  --glass:rgba(255,255,255,0.028);--glass-h:rgba(255,255,255,0.052);
+  --border:rgba(255,255,255,0.06);--border-mid:rgba(91,120,255,0.2);--border-hi:rgba(91,120,255,0.45);
+  --blue:#5b78ff;--indigo:#7c5cfc;--teal:#00d4a8;--green:#00c87a;--rose:#ff4d6d;
+  --amber:#f5b731;--sky:#38bdf8;--orange:#fb923c;
+  --t1:#f0f2ff;--t2:rgba(240,242,255,0.6);--t3:rgba(240,242,255,0.32);--t4:rgba(240,242,255,0.15);
+  --f-head:'Syne',sans-serif;--f-body:'DM Sans',sans-serif;--f-mono:'JetBrains Mono',monospace;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg0);color:var(--t1);font-family:var(--f-body);min-height:100vh;-webkit-font-smoothing:antialiased}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(91,120,255,0.25);border-radius:4px}
+*{scrollbar-width:thin;scrollbar-color:rgba(91,120,255,0.2) transparent}
+
+.page{min-height:100vh;display:flex;flex-direction:column;align-items:center;padding-bottom:40px;position:relative;overflow-x:hidden}
+.page::before{content:'';position:fixed;top:-100px;left:50%;transform:translateX(-50%);width:700px;height:500px;background:radial-gradient(ellipse,rgba(91,120,255,0.1) 0%,rgba(124,92,252,0.05) 45%,transparent 70%);pointer-events:none;z-index:0}
+.page::after{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(91,120,255,0.025) 1px,transparent 1px),linear-gradient(90deg,rgba(91,120,255,0.025) 1px,transparent 1px);background-size:48px 48px;pointer-events:none;z-index:0}
+.inner{position:relative;z-index:1;width:100%;max-width:780px;padding:0 14px}
+
+.news-header{padding:20px 0 16px;display:flex;align-items:center;gap:12px}
+.back-btn{width:36px;height:36px;border-radius:10px;background:var(--glass);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;color:var(--t2);cursor:pointer;flex-shrink:0;transition:background .18s,border-color .18s;text-decoration:none}
+.back-btn:hover{background:var(--glass-h);border-color:var(--border-mid)}
+.hd-block{flex:1}
+.hd-title{font-family:var(--f-head);font-size:21px;font-weight:800;letter-spacing:-.4px;background:linear-gradient(100deg,#e8ecff 50%,rgba(124,92,252,.75));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;line-height:1}
+.hd-sub{font-size:10.5px;color:var(--t3);margin-top:3px;letter-spacing:.1px}
+.live-pill{display:flex;align-items:center;gap:5px;background:rgba(0,200,122,0.08);border:1px solid rgba(0,200,122,0.2);border-radius:20px;padding:5px 11px;flex-shrink:0}
+.live-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:livepulse 2s infinite}
+@keyframes livepulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(0,200,122,.4)}50%{opacity:.5;box-shadow:0 0 0 5px rgba(0,200,122,0)}}
+.live-txt{font-family:var(--f-head);font-size:9px;font-weight:700;color:var(--green);letter-spacing:1px}
+
+.ticker-wrap{width:100%;overflow:hidden;background:rgba(91,120,255,0.05);border-top:1px solid rgba(91,120,255,0.1);border-bottom:1px solid rgba(91,120,255,0.1);padding:6px 0;margin-bottom:14px}
+.ticker-track{display:flex;gap:0;animation:tickerScroll 32s linear infinite;width:max-content}
+.ticker-track:hover{animation-play-state:paused}
+@keyframes tickerScroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+.tick-item{display:flex;align-items:center;gap:6px;padding:0 22px;white-space:nowrap;font-family:var(--f-mono);font-size:10px}
+.tick-sym{color:var(--t2);font-weight:600}.tick-val{color:var(--t1);font-weight:600}
+.tick-chg{font-weight:600;font-size:9.5px}.tick-chg.up{color:var(--green)}.tick-chg.dn{color:var(--rose)}
+.tick-sep{color:var(--border);margin:0 4px}
+
+.search-wrap{position:relative;margin-bottom:12px}
+.search-icon{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--t3);display:flex;align-items:center;pointer-events:none}
+.search-inp{width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:13px;padding:12px 42px 12px 40px;color:var(--t1);font-size:13px;font-family:var(--f-body);outline:none;caret-color:var(--blue);transition:border-color .2s,background .2s,box-shadow .2s}
+.search-inp::placeholder{color:var(--t4);font-size:12px}
+.search-inp:focus{border-color:var(--border-hi);background:rgba(91,120,255,0.05);box-shadow:0 0 0 3px rgba(91,120,255,0.09)}
+.search-clear{position:absolute;right:12px;top:50%;transform:translateY(-50%);width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,0.07);border:none;color:var(--t3);cursor:pointer;display:none;align-items:center;justify-content:center;font-size:12px;transition:background .15s}
+.search-clear.show{display:flex}
+.search-clear:hover{background:rgba(255,255,255,0.12);color:var(--t1)}
+
+.chips-row{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin-bottom:14px;padding-bottom:2px}
+.chips-row::-webkit-scrollbar{display:none}
+.chip{flex-shrink:0;padding:6px 13px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;border:1px solid var(--border);color:var(--t3);background:transparent;font-family:var(--f-body);white-space:nowrap;transition:all .16s}
+.chip:hover{color:var(--t2);border-color:rgba(255,255,255,0.13)}
+.chip.on{color:#fff}
+.chip[data-idx="0"].on{background:rgba(91,120,255,0.16);border-color:rgba(91,120,255,0.42);color:#8ca8ff}
+.chip[data-idx="1"].on{background:rgba(155,107,255,0.16);border-color:rgba(155,107,255,0.42);color:#c4a0ff}
+.chip[data-idx="2"].on{background:rgba(0,200,122,0.13);border-color:rgba(0,200,122,0.38);color:#4de8ab}
+.chip[data-idx="3"].on{background:rgba(245,183,49,0.13);border-color:rgba(245,183,49,0.38);color:#fdd06a}
+.chip[data-idx="4"].on{background:rgba(56,189,248,0.13);border-color:rgba(56,189,248,0.38);color:#7dd5f8}
+.chip[data-idx="5"].on{background:rgba(255,77,109,0.13);border-color:rgba(255,77,109,0.38);color:#ff8fa6}
+
+.section-head{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.section-line{flex:1;height:1px;background:linear-gradient(90deg,var(--border),transparent)}
+.section-lbl{font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--t4);white-space:nowrap}
+
+.news-feed{display:flex;flex-direction:column;gap:7px}
+.news-card{background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:14px 15px;cursor:pointer;position:relative;overflow:hidden;transition:transform .2s cubic-bezier(.23,1,.32,1),border-color .2s,box-shadow .2s,background .2s;animation:cardIn .38s ease both}
+.news-card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(91,120,255,0.2),transparent)}
+.news-card::after{content:'';position:absolute;top:0;left:-120%;width:60%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.025),transparent);transition:left .45s ease;pointer-events:none}
+.news-card:hover::after{left:150%}
+.news-card:hover{transform:translateY(-2px);border-color:var(--border-mid);box-shadow:0 8px 32px rgba(0,0,0,0.35);background:var(--bg3)}
+.news-card.featured{background:linear-gradient(135deg,rgba(91,120,255,0.07) 0%,var(--bg2) 55%);border-color:rgba(91,120,255,0.22)}
+.news-card.featured:hover{border-color:rgba(91,120,255,0.42)}
+@keyframes cardIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+
+.card-meta-top{display:flex;align-items:center;gap:8px;margin-bottom:9px;flex-wrap:wrap}
+.cat-tag{font-size:8.5px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;padding:2px 8px;border-radius:20px;flex-shrink:0;background:rgba(91,120,255,0.15);color:#8ca8ff;border:1px solid rgba(91,120,255,0.25)}
+.card-time{font-family:var(--f-mono);font-size:9.5px;color:var(--t3);flex-shrink:0}
+.impact-badge{margin-left:auto;font-size:8px;font-weight:700;letter-spacing:.6px;padding:2px 7px;border-radius:20px;flex-shrink:0;text-transform:uppercase}
+.impact-high{background:rgba(255,77,109,0.14);color:#ff8fa6;border:1px solid rgba(255,77,109,0.22)}
+.impact-med{background:rgba(245,183,49,0.12);color:#fdd06a;border:1px solid rgba(245,183,49,0.2)}
+.impact-low{background:rgba(255,255,255,0.06);color:var(--t3);border:1px solid var(--border)}
+
+.card-headline{font-family:var(--f-head);font-size:14px;font-weight:700;color:var(--t1);line-height:1.42;margin-bottom:7px;letter-spacing:-.15px}
+.news-card.featured .card-headline{font-size:15.5px}
+.card-summary{font-size:11.5px;color:var(--t2);line-height:1.58;margin-bottom:10px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.card-meta-bot{display:flex;align-items:center;gap:10px}
+.card-source{display:flex;align-items:center;gap:5px}
+.source-dot{width:16px;height:16px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:7px;font-weight:800;color:#fff;flex-shrink:0}
+.source-name{font-size:10.5px;font-weight:600;color:var(--t3)}
+.card-region{display:flex;align-items:center;gap:4px;font-size:10px;color:var(--t4)}
+.read-more-btn{margin-left:auto;font-size:10px;font-weight:600;color:var(--blue);display:flex;align-items:center;gap:3px;opacity:.7;transition:opacity .15s;flex-shrink:0}
+.news-card:hover .read-more-btn{opacity:1}
+.news-card.compact{display:flex;align-items:flex-start;gap:12px;padding:12px 14px}
+.compact-left{flex:1;min-width:0}
+.compact-right{flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:6px;padding-top:2px}
+.news-card.compact .card-headline{font-size:13px;margin-bottom:5px}
+.news-card.compact .card-summary{font-size:11px;margin-bottom:0;-webkit-line-clamp:2}
+.compact-time{font-family:var(--f-mono);font-size:9px;color:var(--t4);white-space:nowrap}
+
+.skeleton-card{background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:14px 15px;animation:cardIn .3s ease both}
+.skel{border-radius:6px;background:rgba(255,255,255,0.05);animation:shimmer 1.6s ease-in-out infinite}
+@keyframes shimmer{0%,100%{opacity:.5}50%{opacity:1}}
+.skel-row{display:flex;gap:8px;margin-bottom:10px}
+.skel-tag{height:16px;width:52px;border-radius:20px}.skel-time{height:12px;width:40px;border-radius:4px}
+.skel-h1{height:14px;width:85%;border-radius:4px;margin-bottom:6px}.skel-h2{height:14px;width:65%;border-radius:4px;margin-bottom:10px}
+.skel-s1{height:10px;width:95%;border-radius:4px;margin-bottom:5px}.skel-s2{height:10px;width:78%;border-radius:4px}
+
+.empty-state{display:none;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:52px 20px;text-align:center}
+.empty-state.show{display:flex}
+.empty-icon{width:58px;height:58px;border-radius:18px;background:var(--bg2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;margin-bottom:4px}
+.empty-title{font-family:var(--f-head);font-size:15px;font-weight:700;color:var(--t2)}
+.empty-sub{font-size:11.5px;color:var(--t3);line-height:1.55;max-width:260px}
+.retry-btn{margin-top:8px;padding:9px 20px;border-radius:10px;background:rgba(91,120,255,0.15);border:1px solid rgba(91,120,255,0.3);color:#8ca8ff;font-family:var(--f-body);font-size:12px;font-weight:600;cursor:pointer;transition:background .15s}
+.retry-btn:hover{background:rgba(91,120,255,0.25)}
+
+.feed-loading{display:none;flex-direction:column;gap:8px}
+.feed-loading.show{display:flex}
+
+.status-bar{display:flex;align-items:center;gap:8px;margin-bottom:12px;padding:8px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:10px}
+.status-txt{font-size:10.5px;color:var(--t3);flex:1}
+.status-txt span{color:var(--t2);font-weight:600}
+.refresh-btn{display:flex;align-items:center;gap:4px;font-size:10px;font-weight:600;color:var(--blue);background:none;border:none;cursor:pointer;font-family:var(--f-body);padding:4px 8px;border-radius:6px;transition:background .15s}
+.refresh-btn:hover{background:rgba(91,120,255,0.1)}
+.refresh-btn.spinning svg{animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.src-badge{font-size:8px;padding:1px 5px;border-radius:3px;font-weight:700;letter-spacing:.5px;margin-left:4px}
+.src-live{background:rgba(0,200,122,0.15);color:#4de8ab;border:1px solid rgba(0,200,122,0.25)}
+
+@media(max-width:520px){.hd-title{font-size:17px}.news-card.featured .card-headline{font-size:14px}.card-headline{font-size:12.5px}.card-summary{font-size:11px}}
+@media(max-width:380px){.inner{padding:0 10px}.news-card{padding:12px 12px}}
+</style>
+</head>
+<body>
+<div class="page">
+<div class="inner">
+
+  <div class="news-header">
+    <a class="back-btn" href="#" onclick="return false;" title="Back">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="15 18 9 12 15 6"/></svg>
+    </a>
+    <div class="hd-block">
+      <div class="hd-title">Live Forex News</div>
+      <div class="hd-sub">Real-time currency &amp; market intelligence</div>
+    </div>
+    <div class="live-pill">
+      <span class="live-dot"></span>
+      <span class="live-txt">LIVE</span>
+    </div>
+  </div>
+
+  <div class="ticker-wrap">
+    <div class="ticker-track" id="tickerTrack"></div>
+  </div>
+
+  <div class="search-wrap">
+    <span class="search-icon">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    </span>
+    <input class="search-inp" id="searchInp" type="text"
+      placeholder="Search: USD, EUR, interest rate, inflation, Fed…"
+      autocomplete="off"/>
+    <button class="search-clear" id="searchClear" onclick="clearSearch()">&#x2715;</button>
+  </div>
+
+  <div class="chips-row" id="chipsRow">
+    <button class="chip on" data-idx="0" onclick="setChip(this)">Forex</button>
+    <button class="chip"    data-idx="1" onclick="setChip(this)">Crypto</button>
+    <button class="chip"    data-idx="2" onclick="setChip(this)">Stocks</button>
+    <button class="chip"    data-idx="3" onclick="setChip(this)">Commodities</button>
+    <button class="chip"    data-idx="4" onclick="setChip(this)">Economy</button>
+    <button class="chip"    data-idx="5" onclick="setChip(this)">Central Banks</button>
+  </div>
+
+  <div class="status-bar">
+    <div class="status-txt" id="statusTxt">Fetching live forex news…</div>
+    <button class="refresh-btn" id="refreshBtn" onclick="loadNews(true)">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+      Refresh
+    </button>
+  </div>
+
+  <div class="feed-loading" id="feedLoading">
+    <div class="skeleton-card"><div class="skel-row"><div class="skel skel-tag"></div><div class="skel skel-time"></div></div><div class="skel skel-h1"></div><div class="skel skel-h2"></div><div class="skel skel-s1"></div><div class="skel skel-s2"></div></div>
+    <div class="skeleton-card"><div class="skel-row"><div class="skel skel-tag"></div><div class="skel skel-time"></div></div><div class="skel skel-h1"></div><div class="skel skel-h2"></div></div>
+    <div class="skeleton-card"><div class="skel-row"><div class="skel skel-tag"></div><div class="skel skel-time"></div></div><div class="skel skel-h1"></div><div class="skel skel-h2"></div></div>
+  </div>
+
+  <div class="section-head" id="sectionHead" style="display:none;">
+    <div class="section-lbl" id="sectionLbl">Latest Forex Headlines</div>
+    <div class="section-line"></div>
+    <div class="section-lbl" id="sectionCount"></div>
+  </div>
+
+  <div class="news-feed" id="newsFeed"></div>
+
+  <div class="empty-state" id="emptyState">
+    <div class="empty-icon">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="1.6"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/></svg>
+    </div>
+    <div class="empty-title">No news loaded</div>
+    <div class="empty-sub" id="emptyMsg">dc0df16936e641798eb047bfa57d00a3 with your NewsAPI key from newsapi.org</div>
+    <button class="retry-btn" onclick="loadNews(true)">&#8635; Try Again</button>
+  </div>
+
+</div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════
+   ▶  STEP 1 — Paste your NewsAPI key here (newsapi.org)
+      Free plan: 100 requests/day, developer use only.
+      Note: NewsAPI free tier only works on localhost or
+      with a backend proxy in production.
+═══════════════════════════════════════════════════════════ */
+var API_KEY = 'dc0df16936e641798eb047bfa57d00a3';
+
+/* ═══════════════════════════════════════════════════════════
+   NEWSAPI CONFIG
+   Endpoint  : https://newsapi.org/v2/everything
+   CORS note : NewsAPI blocks direct browser requests on
+               production domains. On localhost (Live
+               Server / file://) it works fine. For a
+               deployed site use the proxy below.
+   PROXY     : corsproxy.io wraps the request when running
+               outside localhost — toggle USE_PROXY = true.
+═══════════════════════════════════════════════════════════ */
+var NEWSAPI_URL = 'https://newsapi.org/v2/everything';
+var USE_PROXY   = false;   /* set true if deploying to a real domain */
+var PROXY_URL   = 'https://corsproxy.io/?';
+
+/* ── Chip keyword definitions ── */
+var CHIP_KEYWORDS = [
+  'forex OR currency OR "USD" OR "EUR" OR "GBP" OR "JPY" OR "exchange rate" OR "currency pair"',
+  'bitcoin OR ethereum OR cryptocurrency OR crypto OR "blockchain" OR "DeFi" OR altcoin',
+  '"stock market" OR equities OR "S&P 500" OR NASDAQ OR "Dow Jones" OR earnings OR IPO',
+  'gold OR silver OR "crude oil" OR commodity OR commodities OR copper OR "natural gas"',
+  'economy OR GDP OR inflation OR recession OR "consumer price" OR unemployment OR "trade deficit"',
+  '"central bank" OR "Federal Reserve" OR "interest rate" OR ECB OR "Bank of England" OR "rate hike" OR "rate cut"'
+];
+
+var CHIP_LABELS = ['Forex','Crypto','Stocks','Commodities','Economy','Central Banks'];
+
+/* ── State ── */
+var activeIdx   = 0;
+var searchQuery = '';
+var allNews     = [];
+var isLoading   = false;
+var lastFetch   = 0;
+var CACHE_MS    = 3 * 60 * 1000;
+var searchTimer;
+
+/* ═══════════════════════════════════════════════════════════
+   BUILD NEWSAPI REQUEST URL
+═══════════════════════════════════════════════════════════ */
+function buildNewsApiUrl(keyword) {
+  /* NewsAPI /everything parameters:
+     q         — keyword query (supports OR, AND, quotes)
+     language  — en
+     sortBy    — publishedAt (newest first)
+     pageSize  — max 100 on free tier; we use 20
+     apiKey    — your key                              */
+  var base = NEWSAPI_URL
+    + '?q='        + encodeURIComponent(keyword)
+    + '&language=en'
+    + '&sortBy=publishedAt'
+    + '&pageSize=20'
+    + '&apiKey='   + API_KEY;
+
+  return USE_PROXY ? (PROXY_URL + encodeURIComponent(base)) : base;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   FETCH NEWS  (main function)
+═══════════════════════════════════════════════════════════ */
+async function fetchNews(keyword) {
+  var url = buildNewsApiUrl(keyword);
+  console.log('[NewsAPI] Fetching:', url.replace(API_KEY, '***'));
+
+  var response = await fetch(url, {
+    method: 'GET',
+    headers: { 'Accept': 'application/json' }
+  });
+
+  if (!response.ok) {
+    throw new Error('HTTP ' + response.status + ' — ' + response.statusText);
+  }
+
+  /* If proxy is used, allorigins.win wraps in { contents: "..." } */
+  var raw = await response.json();
+  var data = (raw.contents !== undefined) ? JSON.parse(raw.contents) : raw;
+
+  console.log('[NewsAPI] Status:', data.status, '| Total:', data.totalResults);
+
+  if (data.status === 'error') {
+    throw new Error('NewsAPI error: ' + data.message);
+  }
+
+  if (!data.articles || data.articles.length === 0) {
+    throw new Error('No articles returned for this query');
+  }
+
+  /* Filter out articles with "[Removed]" title (NewsAPI placeholder) */
+  var clean = data.articles.filter(function(a) {
+    return a.title && a.title !== '[Removed]' && a.url;
+  });
+
+  if (clean.length === 0) {
+    throw new Error('All returned articles were removed/unavailable');
+  }
+
+  return clean;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   MAP NewsAPI article → internal UI card format
+═══════════════════════════════════════════════════════════ */
+function mapArticle(article, idx) {
+  var sourceName = (article.source && article.source.name)
+    ? article.source.name : 'Reuters';
+
+  /* Calculate minutes ago from publishedAt ISO string */
+  var pubDate   = article.publishedAt ? new Date(article.publishedAt) : new Date();
+  var diffMin   = Math.max(0, Math.round((Date.now() - pubDate.getTime()) / 60000));
+
+  var titleDesc = (article.title || '') + ' ' + (article.description || '');
+
+  return {
+    headline:   article.title          || 'No title',
+    summary:    article.description    || article.content || '',
+    url:        article.url            || '#',
+    source:     sourceName,
+    label:      guessLabel(titleDesc),
+    minutesAgo: diffMin,
+    impact:     idx === 0 ? 'High' : idx < 4 ? 'Medium' : 'Low',
+    region:     guessRegion(titleDesc)
+  };
+}
+
+/* ── Label guesser ── */
+function guessLabel(text) {
+  var t = (text || '').toLowerCase();
+  if (/bitcoin|ethereum|crypto|blockchain|btc|eth|defi|altcoin/.test(t))         return 'Crypto';
+  if (/gold|silver|oil|copper|commodity|commodities|crude|brent|wti/.test(t))    return 'Commodities';
+  if (/stock|equity|shares|nasdaq|s&p|dow|earnings|ipo|dividend/.test(t))        return 'Stocks';
+  if (/central bank|federal reserve|ecb|boe|boj|interest rate|rate hike/.test(t)) return 'Central Banks';
+  if (/economy|gdp|inflation|recession|cpi|jobs|unemployment/.test(t))            return 'Economy';
+  return 'Forex';
+}
+
+/* ── Region guesser ── */
+function guessRegion(text) {
+  var t = (text || '').toLowerCase();
+  if (/india|nifty|sensex|rbi|rupee|bse|nse/.test(t))    return 'India';
+  if (/china|yuan|pboc|beijing|shanghai/.test(t))         return 'China';
+  if (/europe|ecb|eurozone|germany|france/.test(t))       return 'Europe';
+  if (/uk|britain|england|boe|london|sterling/.test(t))   return 'UK';
+  if (/japan|boj|yen|tokyo/.test(t))                      return 'Japan';
+  if (/us |usa|fed |federal|wall street|new york/.test(t)) return 'US';
+  return '';
+}
+
+/* ═══════════════════════════════════════════════════════════
+   MAIN LOAD ORCHESTRATOR
+═══════════════════════════════════════════════════════════ */
+async function loadNews(force) {
+  var now = Date.now();
+  if (!force && allNews.length && (now - lastFetch) < CACHE_MS) {
+    renderCards(applyFilter());
+    return;
+  }
+  if (isLoading) return;
+  isLoading = true;
+
+  /* Show skeleton loaders */
+  document.getElementById('feedLoading').classList.add('show');
+  document.getElementById('newsFeed').innerHTML = '';
+  document.getElementById('emptyState').classList.remove('show');
+  document.getElementById('sectionHead').style.display = 'none';
+  document.getElementById('statusTxt').innerHTML = 'Searching live news…';
+  document.getElementById('refreshBtn').classList.add('spinning');
+
+  /* Determine keyword: typed search overrides chip keyword */
+  var keyword = searchQuery.trim()
+    ? searchQuery.trim()
+    : CHIP_KEYWORDS[activeIdx];
+
+  try {
+    var articles = await fetchNews(keyword);
+
+    /* Sort newest first (NewsAPI already does this, but enforce it) */
+    articles.sort(function(a, b) {
+      return new Date(b.publishedAt || 0) - new Date(a.publishedAt || 0);
+    });
+
+    allNews   = articles.map(mapArticle);
+    lastFetch = Date.now();
+
+    renderCards(applyFilter());
+
+    var t  = new Date();
+    var hh = String(t.getHours()).padStart(2, '0');
+    var mm = String(t.getMinutes()).padStart(2, '0');
+    document.getElementById('statusTxt').innerHTML =
+      'Updated <span>' + hh + ':' + mm + '</span>'
+      + ' &bull; <span>' + allNews.length + ' stories</span> via NewsAPI';
+
+  } catch (err) {
+    console.error('[TradeXAI]', err);
+
+    /* User-friendly error messages */
+    var msg = err.message || 'Unknown error';
+    if (msg.indexOf('401') !== -1 || msg.toLowerCase().indexOf('apikey') !== -1) {
+      msg = 'Invalid API key — replace YOUR_API_KEY in the script';
+    } else if (msg.indexOf('426') !== -1) {
+      msg = 'NewsAPI: Upgrade required for production use. Works on localhost.';
+    } else if (msg.indexOf('429') !== -1) {
+      msg = 'Rate limit reached — try again in a few minutes';
+    } else if (msg.toLowerCase().indexOf('failed to fetch') !== -1) {
+      msg = 'Network error — check your connection or enable USE_PROXY = true';
+    }
+
+    document.getElementById('statusTxt').innerHTML = '&#9888; ' + msg;
+    if (!allNews.length) renderCards([]);
+
+  } finally {
+    isLoading = false;
+    document.getElementById('feedLoading').classList.remove('show');
+    document.getElementById('refreshBtn').classList.remove('spinning');
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   CLIENT-SIDE FILTER (search within loaded articles)
+═══════════════════════════════════════════════════════════ */
+function applyFilter() {
+  var q = searchQuery.toLowerCase().trim();
+  if (!q) return allNews;
+  return allNews.filter(function(n) {
+    var hay = [n.headline, n.summary, n.label, n.source, n.region]
+      .join(' ').toLowerCase();
+    return hay.indexOf(q) !== -1;
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════
+   RENDER CARDS
+═══════════════════════════════════════════════════════════ */
+var SOURCE_COLORS = {
+  'Reuters':            '#e05c00',
+  'Bloomberg':          '#5b78ff',
+  'Financial Times':    '#ffb820',
+  'FT':                 '#ffb820',
+  'The Wall Street Journal': '#0080cc',
+  'WSJ':                '#0080cc',
+  'CNBC':               '#00a0e3',
+  'MarketWatch':        '#00a651',
+  "Barron's":           '#cc0000',
+  'CoinDesk':           '#9b6bff',
+  'The Economic Times': '#e74c3c',
+  'Nikkei':             '#e60026',
+  'Seeking Alpha':      '#1a7f37',
+  'Yahoo Finance':      '#7B00D1',
+  'The Block':          '#7c5cfc',
+  'Investopedia':       '#007bff',
+  'Forbes':             '#cc0000',
+  'Business Insider':   '#4f97d7',
+  'CNN':                '#cc0000',
+  'BBC News':           '#bb1919',
+  'The Guardian':       '#005689',
+  'FX Street':          '#1a73e8',
+  'DailyFX':            '#1565c0',
+  'Forex Factory':      '#1a237e'
+};
+
+function getSrcColor(name) {
+  return SOURCE_COLORS[name] || '#5b78ff';
+}
+
+function renderCards(list) {
+  var feed = document.getElementById('newsFeed');
+  var emp  = document.getElementById('emptyState');
+  var sh   = document.getElementById('sectionHead');
+
+  feed.innerHTML = '';
+
+  if (!list || list.length === 0) {
+    emp.classList.add('show');
+    sh.style.display = 'none';
+    document.getElementById('emptyMsg').textContent = searchQuery
+      ? 'No results for "' + searchQuery + '". Try a broader term.'
+      : 'No news loaded. Check your API key or tap Try Again.';
+    return;
+  }
+
+  emp.classList.remove('show');
+  sh.style.display  = 'flex';
+  document.getElementById('sectionLbl').textContent = searchQuery
+    ? 'Results for "' + searchQuery + '"'
+    : CHIP_LABELS[activeIdx] + ' News';
+  document.getElementById('sectionCount').textContent = list.length + ' stories';
+
+  list.forEach(function(item, idx) {
+    var color    = getSrcColor(item.source);
+    var initials = (item.source || 'NN').substring(0, 2).toUpperCase();
+    var impCls   = item.impact === 'High'
+      ? 'impact-high'
+      : item.impact === 'Medium' ? 'impact-med' : 'impact-low';
+
+    if (idx === 0) {
+      /* ── FEATURED (first) card ── */
+      var card = document.createElement('div');
+      card.className = 'news-card featured';
+      card.style.cursor = 'pointer';
+      card.onclick = function() { window.open(item.url, '_blank', 'noopener,noreferrer'); };
+      card.innerHTML =
+        '<div class="card-meta-top">'
+          + '<span class="cat-tag">'    + esc(item.label)  + '</span>'
+          + '<span class="card-time">'  + timeAgo(item.minutesAgo) + '</span>'
+          + '<span class="impact-badge ' + impCls + '">' + esc(item.impact) + ' Impact</span>'
+        + '</div>'
+        + '<div class="card-headline">' + esc(item.headline) + '</div>'
+        + (item.summary ? '<div class="card-summary">' + esc(item.summary) + '</div>' : '')
+        + '<div class="card-meta-bot">'
+          + '<div class="card-source">'
+            + '<div class="source-dot" style="background:' + color + '">' + initials + '</div>'
+            + '<span class="source-name">' + esc(item.source) + '</span>'
+            + '<span class="src-badge src-live">LIVE</span>'
+          + '</div>'
+          + (item.region
+              ? '<div class="card-region">'
+                  + '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">'
+                  + '<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/>'
+                  + '<path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>'
+                  + '</svg>' + esc(item.region) + '</div>'
+              : '')
+          + '<span class="read-more-btn">Read '
+            + '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">'
+            + '<line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>'
+          + '</span>'
+        + '</div>';
+      feed.appendChild(card);
+
+    } else {
+      /* ── COMPACT card ── */
+      var card2 = document.createElement('div');
+      card2.className = 'news-card compact';
+      card2.style.animationDelay = (idx * 0.04) + 's';
+      card2.style.cursor = 'pointer';
+      card2.onclick = function() { window.open(item.url, '_blank', 'noopener,noreferrer'); };
+      card2.innerHTML =
+        '<div class="compact-left">'
+          + '<div class="card-meta-top" style="margin-bottom:6px;">'
+            + '<span class="cat-tag">' + esc(item.label) + '</span>'
+            + '<span class="impact-badge ' + impCls + '">' + esc(item.impact) + '</span>'
+          + '</div>'
+          + '<div class="card-headline">' + esc(item.headline) + '</div>'
+          + (item.summary ? '<div class="card-summary">' + esc(item.summary) + '</div>' : '')
+          + '<div class="card-source" style="margin-top:6px;">'
+            + '<div class="source-dot" style="background:' + color + '">' + initials + '</div>'
+            + '<span class="source-name">' + esc(item.source) + '</span>'
+            + '<span class="src-badge src-live">LIVE</span>'
+          + '</div>'
+        + '</div>'
+        + '<div class="compact-right">'
+          + '<span class="compact-time">' + timeAgo(item.minutesAgo) + '</span>'
+          + (item.region
+              ? '<span style="font-size:9px;color:var(--t4);">' + esc(item.region) + '</span>'
+              : '')
+        + '</div>';
+      feed.appendChild(card2);
+    }
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════
+   CHIP BUTTONS
+═══════════════════════════════════════════════════════════ */
+function setChip(btn) {
+  document.querySelectorAll('.chip').forEach(function(c) { c.classList.remove('on'); });
+  btn.classList.add('on');
+  activeIdx   = parseInt(btn.dataset.idx, 10);
+  allNews     = [];
+  searchQuery = '';
+  document.getElementById('searchInp').value = '';
+  document.getElementById('searchClear').classList.remove('show');
+  loadNews(true);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SEARCH INPUT
+═══════════════════════════════════════════════════════════ */
+document.getElementById('searchInp').addEventListener('input', function() {
+  var v = this.value;
+  document.getElementById('searchClear').classList.toggle('show', v.length > 0);
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(function() {
+    searchQuery = v;
+    allNews     = [];
+    loadNews(true);
+  }, 600);
+});
+
+function clearSearch() {
+  document.getElementById('searchInp').value = '';
+  document.getElementById('searchClear').classList.remove('show');
+  searchQuery = '';
+  allNews     = [];
+  loadNews(true);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   HELPERS
+═══════════════════════════════════════════════════════════ */
+function timeAgo(min) {
+  if (!min || min < 1) return 'Just now';
+  if (min < 60) return min + 'm ago';
+  var h = Math.floor(min / 60);
+  return h + 'h ' + (min % 60 ? (min % 60) + 'm' : '') + ' ago';
+}
+
+function esc(s) {
+  return String(s || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+/* ═══════════════════════════════════════════════════════════
+   TICKER (static display — swap for live data if available)
+═══════════════════════════════════════════════════════════ */
+var TICKERS = [
+  {sym:'EUR/USD',val:'1.0842',chg:'+0.12%',up:true},
+  {sym:'GBP/USD',val:'1.2734',chg:'-0.08%',up:false},
+  {sym:'USD/JPY',val:'149.62',chg:'+0.31%',up:true},
+  {sym:'XAU/USD',val:'2,318', chg:'+0.54%',up:true},
+  {sym:'BTC/USD',val:'68,240',chg:'+1.82%',up:true},
+  {sym:'ETH/USD',val:'3,512', chg:'+0.97%',up:true},
+  {sym:'S&P 500',val:'5,284', chg:'+0.43%',up:true},
+  {sym:'NASDAQ', val:'18,642',chg:'+0.61%',up:true},
+  {sym:'WTI Oil',val:'82.14', chg:'-0.38%',up:false},
+  {sym:'DXY',    val:'104.32',chg:'-0.14%',up:false},
+  {sym:'Nifty50',val:'22,519',chg:'+0.28%',up:true},
+  {sym:'USD/INR',val:'83.41', chg:'+0.05%',up:true},
+  {sym:'Silver', val:'27.84', chg:'+0.72%',up:true},
+  {sym:'AUD/USD',val:'0.6612',chg:'+0.19%',up:true},
+  {sym:'USD/CAD',val:'1.3580',chg:'-0.11%',up:false},
+  {sym:'USD/CHF',val:'0.9043',chg:'+0.08%',up:true}
+];
+
+function buildTicker() {
+  var doubled = TICKERS.concat(TICKERS);
+  document.getElementById('tickerTrack').innerHTML = doubled.map(function(t) {
+    return '<div class="tick-item">'
+      + '<span class="tick-sym">' + t.sym + '</span>'
+      + '<span class="tick-val">' + t.val + '</span>'
+      + '<span class="tick-chg ' + (t.up ? 'up' : 'dn') + '">' + t.chg + '</span>'
+      + '<span class="tick-sep">|</span>'
+      + '</div>';
+  }).join('');
+}
+
+/* ═══════════════════════════════════════════════════════════
+   BOOT
+═══════════════════════════════════════════════════════════ */
+/* Auto-refresh every 5 minutes */
+setInterval(function() {
+  if (!searchQuery && !isLoading) loadNews(false);
+}, 5 * 60 * 1000);
+
+buildTicker();
+loadNews(true);
+</script>
+</body>
+</html>

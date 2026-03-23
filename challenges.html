@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>TradeXpro Simulator</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root{
+  --bg:       #080b10;
+  --panel:    #0d1117;
+  --card:     #111820;
+  --border:   rgba(255,255,255,0.07);
+  --border2:  rgba(255,255,255,0.04);
+  --blue:     #2962ff;
+  --blue2:    #1e4fd8;
+  --green:    #00c853;
+  --green2:   #009624;
+  --red:      #ff1744;
+  --red2:     #c4001a;
+  --gold:     #ffc400;
+  --text:     rgba(255,255,255,0.9);
+  --muted:    rgba(255,255,255,0.35);
+  --dim:      rgba(255,255,255,0.15);
+  --mono:     'JetBrains Mono', monospace;
+  --display:  'Syne', sans-serif;
+}
+
+html,body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:var(--mono);
+  height:100%;
+  overflow:hidden;
+}
+
+/* ── Layout ── */
+.shell{
+  display:grid;
+  grid-template-rows:48px 1fr;
+  grid-template-columns:1fr 320px;
+  height:100vh;
+  gap:0;
+}
+
+/* ── Topbar ── */
+.topbar{
+  grid-column:1/-1;
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:0 16px;
+  background:var(--panel);
+  border-bottom:1px solid var(--border);
+  z-index:10;
+}
+
+.logo{
+  font-family:var(--display);
+  font-size:17px;
+  font-weight:800;
+  color:#fff;
+  letter-spacing:-0.5px;
+  margin-right:8px;
+  white-space:nowrap;
+}
+.logo span{color:var(--gold);}
+
+/* symbol selector */
+.sym-wrap{
+  display:flex;
+  align-items:center;
+  gap:0;
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:8px;
+  overflow:hidden;
+}
+.sym-btn{
+  padding:6px 11px;
+  font-family:var(--mono);
+  font-size:11px;
+  font-weight:700;
+  color:var(--muted);
+  background:none;
+  border:none;
+  cursor:pointer;
+  white-space:nowrap;
+  transition:background .15s,color .15s;
+  border-right:1px solid var(--border2);
+  letter-spacing:.3px;
+}
+.sym-btn:last-child{border-right:none;}
+.sym-btn:hover{background:rgba(255,255,255,0.05);color:var(--text);}
+.sym-btn.active{background:var(--blue);color:#fff;}
+
+/* live price in topbar */
+.live-price{
+  margin-left:auto;
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.lp-sym{font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.5px;}
+.lp-val{font-size:15px;font-weight:700;color:#fff;font-family:var(--mono);}
+.lp-chg{font-size:11px;font-weight:700;}
+.lp-chg.up{color:var(--green);}
+.lp-chg.dn{color:var(--red);}
+
+.dot{
+  width:6px;height:6px;border-radius:50%;
+  background:var(--green);
+  box-shadow:0 0 6px var(--green);
+  animation:blink 1.8s infinite;
+}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* ── Chart area ── */
+.chart-wrap{
+  position:relative;
+  background:var(--bg);
+  overflow:hidden;
+}
+
+#tv-widget{
+  width:100%;
+  height:100%;
+}
+
+/* ── Side panel ── */
+.side{
+  display:flex;
+  flex-direction:column;
+  background:var(--panel);
+  border-left:1px solid var(--border);
+  overflow-y:auto;
+  scrollbar-width:thin;
+  scrollbar-color:rgba(255,255,255,0.1) transparent;
+}
+.side::-webkit-scrollbar{width:3px;}
+.side::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);border-radius:4px;}
+
+/* section header */
+.sec-head{
+  padding:12px 14px 8px;
+  font-size:9px;
+  font-weight:700;
+  letter-spacing:1.2px;
+  text-transform:uppercase;
+  color:var(--dim);
+  border-bottom:1px solid var(--border2);
+}
+
+/* ── Instrument info ── */
+.inst-block{
+  padding:12px 14px;
+  border-bottom:1px solid var(--border2);
+}
+.inst-name{
+  font-family:var(--display);
+  font-size:20px;
+  font-weight:800;
+  color:#fff;
+  letter-spacing:-0.5px;
+  margin-bottom:2px;
+}
+.inst-full{font-size:10px;color:var(--muted);margin-bottom:10px;}
+
+.price-row{display:flex;align-items:baseline;gap:8px;margin-bottom:6px;}
+.price-big{font-size:26px;font-weight:700;color:#fff;font-family:var(--mono);}
+.price-chg{
+  font-size:11px;font-weight:700;padding:2px 8px;
+  border-radius:5px;
+}
+.price-chg.up{background:rgba(0,200,83,.15);color:var(--green);}
+.price-chg.dn{background:rgba(255,23,68,.15);color:var(--red);}
+
+.ohlc-grid{
+  display:grid;grid-template-columns:1fr 1fr;
+  gap:4px 8px;
+}
+.ohlc-item{display:flex;justify-content:space-between;align-items:center;}
+.ohlc-lbl{font-size:9px;color:var(--dim);letter-spacing:.5px;}
+.ohlc-val{font-size:11px;font-weight:600;color:var(--muted);}
+
+/* ── Trade form ── */
+.trade-block{
+  padding:12px 14px;
+  border-bottom:1px solid var(--border2);
+  flex-shrink:0;
+}
+
+.trade-type-row{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:6px;
+  margin-bottom:10px;
+}
+.tt-btn{
+  height:36px;border-radius:8px;border:1px solid var(--border);
+  font-family:var(--mono);font-size:12px;font-weight:700;
+  cursor:pointer;transition:all .15s;
+  letter-spacing:.3px;
+}
+.tt-btn.buy{
+  background:rgba(0,200,83,.08);
+  color:rgba(0,200,83,.6);
+  border-color:rgba(0,200,83,.15);
+}
+.tt-btn.buy.active,
+.tt-btn.buy:hover{
+  background:var(--green);
+  color:#000;
+  border-color:var(--green);
+}
+.tt-btn.sell{
+  background:rgba(255,23,68,.08);
+  color:rgba(255,23,68,.6);
+  border-color:rgba(255,23,68,.15);
+}
+.tt-btn.sell.active,
+.tt-btn.sell:hover{
+  background:var(--red);
+  color:#fff;
+  border-color:var(--red);
+}
+
+.field-lbl{font-size:9px;color:var(--dim);letter-spacing:.8px;text-transform:uppercase;margin-bottom:4px;}
+.field-row{margin-bottom:8px;}
+
+.inp{
+  width:100%;
+  height:34px;
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:7px;
+  color:var(--text);
+  font-family:var(--mono);
+  font-size:12px;
+  font-weight:600;
+  padding:0 10px;
+  outline:none;
+  transition:border-color .15s;
+}
+.inp:focus{border-color:rgba(41,98,255,.5);}
+
+.sl-tp-row{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px;}
+
+.execute-btn{
+  width:100%;height:40px;
+  border-radius:8px;border:none;
+  font-family:var(--mono);font-size:13px;font-weight:700;
+  cursor:pointer;letter-spacing:.5px;
+  transition:opacity .15s,transform .1s;
+}
+.execute-btn:active{opacity:.85;transform:scale(.98);}
+.execute-btn.buy-exec{background:linear-gradient(135deg,var(--green),var(--green2));color:#000;}
+.execute-btn.sell-exec{background:linear-gradient(135deg,var(--red),var(--red2));color:#fff;}
+
+/* ── Open positions ── */
+.positions-block{
+  padding:10px 14px;
+  flex:1;
+}
+
+.no-pos{
+  text-align:center;padding:20px 0;
+  font-size:11px;color:var(--dim);
+}
+
+.pos-card{
+  background:var(--card);
+  border:1px solid var(--border2);
+  border-radius:10px;
+  padding:10px 11px;
+  margin-bottom:7px;
+  position:relative;
+  overflow:hidden;
+}
+.pos-card::before{
+  content:'';position:absolute;left:0;top:0;bottom:0;width:3px;
+}
+.pos-card.buy-pos::before{background:var(--green);}
+.pos-card.sell-pos::before{background:var(--red);}
+
+.pos-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;}
+.pos-sym{font-size:12px;font-weight:700;color:#fff;}
+.pos-dir{
+  font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px;letter-spacing:.5px;
+}
+.pos-dir.buy-dir{background:rgba(0,200,83,.15);color:var(--green);}
+.pos-dir.sell-dir{background:rgba(255,23,68,.15);color:var(--red);}
+
+.pos-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px 0;}
+.pos-item{display:flex;flex-direction:column;gap:1px;}
+.pos-lbl{font-size:8px;color:var(--dim);letter-spacing:.5px;}
+.pos-val{font-size:11px;font-weight:600;color:var(--muted);}
+.pos-pnl{font-size:13px;font-weight:700;}
+.pos-pnl.profit{color:var(--green);}
+.pos-pnl.loss{color:var(--red);}
+
+.close-btn{
+  margin-top:8px;
+  width:100%;height:28px;
+  border-radius:6px;border:1px solid var(--border);
+  background:transparent;
+  color:var(--muted);
+  font-family:var(--mono);font-size:10px;font-weight:700;
+  cursor:pointer;letter-spacing:.5px;
+  transition:all .15s;
+}
+.close-btn:hover{background:rgba(255,255,255,.06);color:var(--text);}
+
+/* ── Account summary ── */
+.account-block{
+  padding:10px 14px 14px;
+  border-top:1px solid var(--border2);
+  flex-shrink:0;
+}
+.acc-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+.acc-item{
+  background:var(--card);
+  border:1px solid var(--border2);
+  border-radius:8px;
+  padding:8px 10px;
+}
+.acc-lbl{font-size:8px;color:var(--dim);letter-spacing:.6px;text-transform:uppercase;margin-bottom:3px;}
+.acc-val{font-size:13px;font-weight:700;color:#fff;font-family:var(--mono);}
+.acc-val.profit{color:var(--green);}
+.acc-val.loss{color:var(--red);}
+
+/* ── Toast ── */
+.toast-stack{
+  position:fixed;bottom:20px;right:20px;
+  display:flex;flex-direction:column;gap:6px;
+  z-index:999;pointer-events:none;
+}
+.toast{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:9px 14px;
+  font-size:11px;font-weight:600;color:var(--text);
+  box-shadow:0 4px 24px rgba(0,0,0,.5);
+  animation:slideIn .2s ease,fadeOut .3s ease 2.2s both;
+  white-space:nowrap;
+  display:flex;align-items:center;gap:7px;
+}
+.toast.t-buy{border-color:rgba(0,200,83,.3);}
+.toast.t-sell{border-color:rgba(255,23,68,.3);}
+.toast.t-close{border-color:rgba(255,196,0,.3);}
+@keyframes slideIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
+@keyframes fadeOut{from{opacity:1}to{opacity:0}}
+
+/* ── Responsive ── */
+@media(max-width:900px){
+  .shell{grid-template-columns:1fr;grid-template-rows:48px 1fr auto;}
+  .chart-wrap{min-height:55vh;}
+  .side{max-height:45vh;}
+  html,body{overflow:auto;}
+}
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+  <!-- ── TOPBAR ── -->
+  <div class="topbar">
+    <div class="logo">Trade<span>X</span>pro</div>
+
+    <div class="sym-wrap" id="symWrap">
+      <button class="sym-btn active" data-sym="XAUUSD"  data-full="Gold / USD"          onclick="switchSymbol(this)">GOLD</button>
+      <button class="sym-btn"        data-sym="BTCUSD"  data-full="Bitcoin / USD"        onclick="switchSymbol(this)">BTC</button>
+      <button class="sym-btn"        data-sym="EURUSD"  data-full="Euro / US Dollar"     onclick="switchSymbol(this)">EUR/USD</button>
+      <button class="sym-btn"        data-sym="GBPUSD"  data-full="British Pound / USD"  onclick="switchSymbol(this)">GBP/USD</button>
+      <button class="sym-btn"        data-sym="USDJPY"  data-full="US Dollar / Yen"      onclick="switchSymbol(this)">USD/JPY</button>
+      <button class="sym-btn"        data-sym="ETHUSD"  data-full="Ethereum / USD"       onclick="switchSymbol(this)">ETH</button>
+      <button class="sym-btn"        data-sym="DJ30"    data-full="Dow Jones 30"         onclick="switchSymbol(this)">US30</button>
+      <button class="sym-btn"        data-sym="NASDAQ"  data-full="NASDAQ 100"           onclick="switchSymbol(this)">NAS100</button>
+      <button class="sym-btn"        data-sym="AUDUSD"  data-full="Aust Dollar / USD"    onclick="switchSymbol(this)">AUD/USD</button>
+      <button class="sym-btn"        data-sym="USDCHF"  data-full="US Dollar / Franc"    onclick="switchSymbol(this)">USD/CHF</button>
+    </div>
+
+    <div class="live-price">
+      <span class="dot"></span>
+      <span class="lp-sym" id="lpSym">XAUUSD</span>
+      <span class="lp-val" id="lpVal">—</span>
+      <span class="lp-chg up" id="lpChg">—</span>
+    </div>
+  </div>
+
+  <!-- ── CHART ── -->
+  <div class="chart-wrap">
+    <div id="tv-widget"></div>
+  </div>
+
+  <!-- ── SIDE PANEL ── -->
+  <div class="side">
+
+    <!-- Instrument info -->
+    <div class="inst-block">
+      <div class="inst-name" id="instName">XAUUSD</div>
+      <div class="inst-full" id="instFull">Gold / US Dollar</div>
+      <div class="price-row">
+        <div class="price-big" id="instPrice">—</div>
+        <div class="price-chg up" id="instChg">—</div>
+      </div>
+      <div class="ohlc-grid">
+        <div class="ohlc-item"><span class="ohlc-lbl">BID</span><span class="ohlc-val" id="oBid">—</span></div>
+        <div class="ohlc-item"><span class="ohlc-lbl">ASK</span><span class="ohlc-val" id="oAsk">—</span></div>
+        <div class="ohlc-item"><span class="ohlc-lbl">SPREAD</span><span class="ohlc-val" id="oSpread">—</span></div>
+        <div class="ohlc-item"><span class="ohlc-lbl">CHANGE%</span><span class="ohlc-val" id="oChgPct">—</span></div>
+      </div>
+    </div>
+
+    <!-- Trade form -->
+    <div class="sec-head">New Order</div>
+    <div class="trade-block">
+      <div class="trade-type-row">
+        <button class="tt-btn buy active" id="btnBuy"  onclick="setDir('buy')">▲ BUY</button>
+        <button class="tt-btn sell"       id="btnSell" onclick="setDir('sell')">▼ SELL</button>
+      </div>
+
+      <div class="field-row">
+        <div class="field-lbl">Lot Size</div>
+        <input class="inp" id="inpLot" type="number" value="0.1" min="0.01" step="0.01"/>
+      </div>
+
+      <div class="sl-tp-row">
+        <div class="field-row" style="margin:0">
+          <div class="field-lbl">Stop Loss</div>
+          <input class="inp" id="inpSL" type="number" placeholder="Optional" step="0.01"/>
+        </div>
+        <div class="field-row" style="margin:0">
+          <div class="field-lbl">Take Profit</div>
+          <input class="inp" id="inpTP" type="number" placeholder="Optional" step="0.01"/>
+        </div>
+      </div>
+
+      <button class="execute-btn buy-exec" id="execBtn" onclick="openTrade()">
+        EXECUTE BUY
+      </button>
+    </div>
+
+    <!-- Open positions -->
+    <div class="sec-head">Open Positions <span id="posCount" style="color:var(--blue);margin-left:4px;"></span></div>
+    <div class="positions-block" id="posBlock">
+      <div class="no-pos" id="noPos">No open positions</div>
+    </div>
+
+    <!-- Account -->
+    <div class="sec-head">Account</div>
+    <div class="account-block">
+      <div class="acc-grid">
+        <div class="acc-item">
+          <div class="acc-lbl">Balance</div>
+          <div class="acc-val" id="accBalance">$10,000.00</div>
+        </div>
+        <div class="acc-item">
+          <div class="acc-lbl">Equity</div>
+          <div class="acc-val" id="accEquity">$10,000.00</div>
+        </div>
+        <div class="acc-item">
+          <div class="acc-lbl">Floating P&L</div>
+          <div class="acc-val" id="accPnl">$0.00</div>
+        </div>
+        <div class="acc-item">
+          <div class="acc-lbl">Open Trades</div>
+          <div class="acc-val" id="accTrades">0</div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /side -->
+</div><!-- /shell -->
+
+<div class="toast-stack" id="toastStack"></div>
+
+<!-- TradingView Widget -->
+<script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+
+<script>
+/* ══════════════════════════════════════════
+   STATE
+══════════════════════════════════════════ */
+var account = {
+  balance:  10000,
+  positions: []
+};
+
+var tradeDir     = 'buy';
+var currentSym   = 'XAUUSD';
+var currentPrice = 0;
+var tvWidget     = null;
+var posIdCounter = 1;
+
+/* Symbol metadata */
+var SYMBOLS = {
+  'XAUUSD': { full:'Gold / US Dollar',          pip:0.01,  lotVal:100,  spread:0.3  },
+  'BTCUSD': { full:'Bitcoin / US Dollar',        pip:1,     lotVal:1,    spread:15   },
+  'EURUSD': { full:'Euro / US Dollar',           pip:0.0001,lotVal:100000,spread:0.0001},
+  'GBPUSD': { full:'British Pound / US Dollar',  pip:0.0001,lotVal:100000,spread:0.0002},
+  'USDJPY': { full:'US Dollar / Japanese Yen',   pip:0.01,  lotVal:100000,spread:0.02},
+  'ETHUSD': { full:'Ethereum / US Dollar',       pip:0.1,   lotVal:1,    spread:1.5  },
+  'DJ30':   { full:'Dow Jones 30',               pip:1,     lotVal:10,   spread:2    },
+  'NASDAQ': { full:'NASDAQ 100',                 pip:0.25,  lotVal:20,   spread:1    },
+  'AUDUSD': { full:'Australian Dollar / USD',    pip:0.0001,lotVal:100000,spread:0.0002},
+  'USDCHF': { full:'US Dollar / Swiss Franc',    pip:0.0001,lotVal:100000,spread:0.0002}
+};
+
+/* TradingView symbol mapping */
+var TV_SYMBOLS = {
+  'XAUUSD': 'OANDA:XAUUSD',
+  'BTCUSD': 'BITSTAMP:BTCUSD',
+  'EURUSD': 'OANDA:EURUSD',
+  'GBPUSD': 'OANDA:GBPUSD',
+  'USDJPY': 'OANDA:USDJPY',
+  'ETHUSD': 'COINBASE:ETHUSD',
+  'DJ30':   'FOREXCOM:DJI',
+  'NASDAQ': 'NASDAQ:NDX',
+  'AUDUSD': 'OANDA:AUDUSD',
+  'USDCHF': 'OANDA:USDCHF'
+};
+
+/* ══════════════════════════════════════════
+   TRADINGVIEW WIDGET
+══════════════════════════════════════════ */
+function buildWidget(sym) {
+  var container = document.getElementById('tv-widget');
+  container.innerHTML = '';
+
+  tvWidget = new TradingView.widget({
+    container_id:        'tv-widget',
+    symbol:              TV_SYMBOLS[sym] || ('OANDA:' + sym),
+    interval:            '15',
+    timezone:            'Etc/UTC',
+    theme:               'dark',
+    style:               '1',          /* 1 = Candlestick */
+    locale:              'en',
+    toolbar_bg:          '#0d1117',
+    enable_publishing:   false,
+    hide_top_toolbar:    false,
+    hide_legend:         false,
+    save_image:          false,
+    hide_side_toolbar:   false,
+    withdateranges:      true,
+    allow_symbol_change: false,
+    studies:             ['RSI@tv-studiox', 'MASimple@tv-studiesv!'],
+    overrides: {
+      'mainSeriesProperties.candleStyle.upColor':         '#00c853',
+      'mainSeriesProperties.candleStyle.downColor':       '#ff1744',
+      'mainSeriesProperties.candleStyle.borderUpColor':   '#00c853',
+      'mainSeriesProperties.candleStyle.borderDownColor': '#ff1744',
+      'mainSeriesProperties.candleStyle.wickUpColor':     '#00c853',
+      'mainSeriesProperties.candleStyle.wickDownColor':   '#ff1744',
+      'paneProperties.background':                        '#080b10',
+      'paneProperties.vertGridProperties.color':          'rgba(255,255,255,0.03)',
+      'paneProperties.horzGridProperties.color':          'rgba(255,255,255,0.03)',
+      'scalesProperties.textColor':                       'rgba(255,255,255,0.35)',
+    },
+    width:  '100%',
+    height: '100%',
+    autosize: true,
+  });
+}
+
+/* ══════════════════════════════════════════
+   SYMBOL SWITCH
+══════════════════════════════════════════ */
+function switchSymbol(btn) {
+  document.querySelectorAll('.sym-btn').forEach(function(b){ b.classList.remove('active'); });
+  btn.classList.add('active');
+
+  var sym  = btn.dataset.sym;
+  currentSym = sym;
+
+  /* Update instrument info panel */
+  document.getElementById('instName').textContent = sym;
+  document.getElementById('instFull').textContent = (SYMBOLS[sym] || {full:sym}).full;
+  document.getElementById('lpSym').textContent    = sym;
+
+  /* Rebuild chart */
+  buildWidget(sym);
+
+  /* Reset price display until new tick */
+  document.getElementById('instPrice').textContent = '—';
+  document.getElementById('instChg').textContent   = '—';
+  document.getElementById('lpVal').textContent     = '—';
+  document.getElementById('lpChg').textContent     = '—';
+
+  /* Simulate price for the new symbol */
+  simulatePriceTick();
+}
+
+/* ══════════════════════════════════════════
+   PRICE SIMULATION
+   (Real tick data would come from a broker
+    WebSocket. Here we seed from realistic
+    base prices and add small random walk.)
+══════════════════════════════════════════ */
+var BASE_PRICES = {
+  'XAUUSD': 2320.50,
+  'BTCUSD': 67800,
+  'EURUSD': 1.0852,
+  'GBPUSD': 1.2734,
+  'USDJPY': 154.62,
+  'ETHUSD': 3480,
+  'DJ30':   39250,
+  'NASDAQ': 17820,
+  'AUDUSD': 0.6612,
+  'USDCHF': 0.9043
+};
+
+var priceSim = {};  /* { sym: { price, open } } */
+
+function initSim() {
+  Object.keys(BASE_PRICES).forEach(function(sym){
+    priceSim[sym] = { price: BASE_PRICES[sym], open: BASE_PRICES[sym] };
+  });
+}
+
+function simulatePriceTick() {
+  var sym  = currentSym;
+  var meta = SYMBOLS[sym] || { pip:0.0001, spread:0.0001 };
+  var sim  = priceSim[sym];
+  if (!sim) return;
+
+  /* Small random walk */
+  var volatility = sim.price * 0.0003;
+  var delta = (Math.random() - 0.497) * volatility;
+  sim.price = parseFloat((sim.price + delta).toFixed(getPrecision(sym)));
+
+  var bid    = sim.price;
+  var ask    = parseFloat((bid + meta.spread).toFixed(getPrecision(sym)));
+  var change = parseFloat((sim.price - sim.open).toFixed(getPrecision(sym)));
+  var chgPct = ((change / sim.open) * 100).toFixed(2);
+
+  currentPrice = bid;
+
+  /* Update topbar */
+  document.getElementById('lpVal').textContent = fmt(sym, bid);
+  var lpChgEl = document.getElementById('lpChg');
+  lpChgEl.textContent = (change >= 0 ? '+' : '') + chgPct + '%';
+  lpChgEl.className   = 'lp-chg ' + (change >= 0 ? 'up' : 'dn');
+
+  /* Update panel */
+  document.getElementById('instPrice').textContent = fmt(sym, bid);
+  var icEl = document.getElementById('instChg');
+  icEl.textContent = (change >= 0 ? '+' : '') + change + ' (' + (change >= 0 ? '+' : '') + chgPct + '%)';
+  icEl.className   = 'price-chg ' + (change >= 0 ? 'up' : 'dn');
+
+  document.getElementById('oBid').textContent     = fmt(sym, bid);
+  document.getElementById('oAsk').textContent     = fmt(sym, ask);
+  document.getElementById('oSpread').textContent  = meta.spread;
+  document.getElementById('oChgPct').textContent  = (change >= 0 ? '+' : '') + chgPct + '%';
+
+  /* Update open positions PnL */
+  updateAllPnl();
+}
+
+function getPrecision(sym) {
+  if (['BTCUSD','DJ30'].includes(sym))         return 2;
+  if (['ETHUSD','NASDAQ'].includes(sym))        return 2;
+  if (['USDJPY'].includes(sym))                 return 3;
+  if (['XAUUSD'].includes(sym))                 return 2;
+  return 5;
+}
+
+function fmt(sym, price) {
+  return price.toFixed(getPrecision(sym));
+}
+
+/* ══════════════════════════════════════════
+   TRADE DIRECTION
+══════════════════════════════════════════ */
+function setDir(dir) {
+  tradeDir = dir;
+  var buyBtn  = document.getElementById('btnBuy');
+  var sellBtn = document.getElementById('btnSell');
+  var execBtn = document.getElementById('execBtn');
+
+  buyBtn.classList.toggle('active', dir === 'buy');
+  sellBtn.classList.toggle('active', dir === 'sell');
+
+  if (dir === 'buy') {
+    execBtn.textContent  = 'EXECUTE BUY';
+    execBtn.className    = 'execute-btn buy-exec';
+  } else {
+    execBtn.textContent  = 'EXECUTE SELL';
+    execBtn.className    = 'execute-btn sell-exec';
+  }
+}
+
+/* ══════════════════════════════════════════
+   OPEN TRADE
+══════════════════════════════════════════ */
+function openTrade() {
+  if (!currentPrice || currentPrice === 0) {
+    showToast('⚠️ Price not ready yet', '');
+    return;
+  }
+
+  var lot = parseFloat(document.getElementById('inpLot').value);
+  var sl  = parseFloat(document.getElementById('inpSL').value)  || null;
+  var tp  = parseFloat(document.getElementById('inpTP').value)  || null;
+
+  if (!lot || lot <= 0) { showToast('⚠️ Invalid lot size', ''); return; }
+
+  var meta   = SYMBOLS[currentSym] || { pip:0.0001, lotVal:100000, spread:0.0001 };
+  var entry  = tradeDir === 'buy'
+    ? parseFloat((currentPrice + meta.spread).toFixed(getPrecision(currentSym)))
+    : currentPrice;
+
+  var pos = {
+    id:    posIdCounter++,
+    sym:   currentSym,
+    dir:   tradeDir,
+    lot:   lot,
+    entry: entry,
+    sl:    sl,
+    tp:    tp,
+    pnl:   0,
+    openAt: new Date().toLocaleTimeString()
+  };
+
+  account.positions.push(pos);
+  renderPositions();
+  updateAccountStats();
+
+  showToast(
+    (tradeDir === 'buy' ? '▲ BUY ' : '▼ SELL ') + currentSym + ' @ ' + fmt(currentSym, entry),
+    tradeDir === 'buy' ? 't-buy' : 't-sell'
+  );
+}
+
+/* ══════════════════════════════════════════
+   CLOSE TRADE
+══════════════════════════════════════════ */
+function closeTrade(id) {
+  var idx = account.positions.findIndex(function(p){ return p.id === id; });
+  if (idx === -1) return;
+
+  var pos = account.positions[idx];
+  var pnl = calcPnl(pos);
+  account.balance += pnl;
+  account.positions.splice(idx, 1);
+
+  renderPositions();
+  updateAccountStats();
+
+  showToast(
+    '✕ Closed ' + pos.sym + ' ' + (pnl >= 0 ? '+' : '') + '$' + pnl.toFixed(2),
+    't-close'
+  );
+}
+
+/* ══════════════════════════════════════════
+   PnL CALCULATION
+══════════════════════════════════════════ */
+function calcPnl(pos) {
+  var meta    = SYMBOLS[pos.sym] || { pip:0.0001, lotVal:100000 };
+  var simData = priceSim[pos.sym];
+  if (!simData) return 0;
+
+  var closePrice = simData.price;
+  var diff = pos.dir === 'buy'
+    ? closePrice - pos.entry
+    : pos.entry  - closePrice;
+
+  /* Check SL/TP */
+  if (pos.tp && pos.dir === 'buy'  && closePrice >= pos.tp) diff = pos.tp - pos.entry;
+  if (pos.tp && pos.dir === 'sell' && closePrice <= pos.tp) diff = pos.entry - pos.tp;
+  if (pos.sl && pos.dir === 'buy'  && closePrice <= pos.sl) diff = pos.sl - pos.entry;
+  if (pos.sl && pos.dir === 'sell' && closePrice >= pos.sl) diff = pos.entry - pos.sl;
+
+  /* Simplified PnL: diff / pip * pip_dollar_value * lot */
+  var pipValue = pos.sym === 'USDJPY' ? (meta.pip * pos.lot * 1000) : (meta.pip * pos.lot * 10);
+  var pips     = diff / meta.pip;
+  return parseFloat((pips * pipValue).toFixed(2));
+}
+
+function updateAllPnl() {
+  var totalPnl = 0;
+  account.positions.forEach(function(pos) {
+    pos.pnl = calcPnl(pos);
+    totalPnl += pos.pnl;
+
+    /* Live update card */
+    var pnlEl = document.getElementById('pnl-' + pos.id);
+    if (pnlEl) {
+      pnlEl.textContent = (pos.pnl >= 0 ? '+' : '') + '$' + pos.pnl.toFixed(2);
+      pnlEl.className   = 'pos-pnl ' + (pos.pnl >= 0 ? 'profit' : 'loss');
+    }
+
+    /* Auto close on SL/TP */
+    var sim = priceSim[pos.sym];
+    if (sim) {
+      var cp = sim.price;
+      if (pos.tp && pos.dir === 'buy'  && cp >= pos.tp) { closeTrade(pos.id); return; }
+      if (pos.tp && pos.dir === 'sell' && cp <= pos.tp) { closeTrade(pos.id); return; }
+      if (pos.sl && pos.dir === 'buy'  && cp <= pos.sl) { closeTrade(pos.id); return; }
+      if (pos.sl && pos.dir === 'sell' && cp >= pos.sl) { closeTrade(pos.id); return; }
+    }
+  });
+
+  /* Update account stats */
+  var equity = account.balance + totalPnl;
+  document.getElementById('accPnl').textContent    = (totalPnl >= 0 ? '+' : '') + '$' + totalPnl.toFixed(2);
+  document.getElementById('accPnl').className      = 'acc-val ' + (totalPnl >= 0 ? 'profit' : 'loss');
+  document.getElementById('accEquity').textContent = '$' + equity.toFixed(2);
+  document.getElementById('accEquity').className   = 'acc-val ' + (equity >= account.balance ? 'profit' : 'loss');
+}
+
+function updateAccountStats() {
+  document.getElementById('accBalance').textContent = '$' + account.balance.toFixed(2);
+  document.getElementById('accTrades').textContent  = account.positions.length;
+  document.getElementById('posCount').textContent   = account.positions.length > 0 ? '(' + account.positions.length + ')' : '';
+  updateAllPnl();
+}
+
+/* ══════════════════════════════════════════
+   RENDER POSITIONS
+══════════════════════════════════════════ */
+function renderPositions() {
+  var block  = document.getElementById('posBlock');
+  var noPos  = document.getElementById('noPos');
+
+  /* Remove old cards */
+  block.querySelectorAll('.pos-card').forEach(function(el){ el.remove(); });
+
+  if (account.positions.length === 0) {
+    noPos.style.display = 'block';
+    return;
+  }
+  noPos.style.display = 'none';
+
+  account.positions.forEach(function(pos) {
+    var card = document.createElement('div');
+    card.className = 'pos-card ' + (pos.dir === 'buy' ? 'buy-pos' : 'sell-pos');
+    card.id = 'pos-card-' + pos.id;
+
+    card.innerHTML =
+      '<div class="pos-top">' +
+        '<span class="pos-sym">' + pos.sym + '</span>' +
+        '<span class="pos-dir ' + (pos.dir === 'buy' ? 'buy-dir' : 'sell-dir') + '">' + pos.dir.toUpperCase() + '</span>' +
+      '</div>' +
+      '<div class="pos-grid">' +
+        '<div class="pos-item"><span class="pos-lbl">ENTRY</span><span class="pos-val">' + fmt(pos.sym, pos.entry) + '</span></div>' +
+        '<div class="pos-item"><span class="pos-lbl">LOT</span><span class="pos-val">' + pos.lot + '</span></div>' +
+        '<div class="pos-item"><span class="pos-lbl">P&L</span><span class="pos-pnl ' + (pos.pnl >= 0 ? 'profit' : 'loss') + '" id="pnl-' + pos.id + '">' + (pos.pnl >= 0 ? '+' : '') + '$' + pos.pnl.toFixed(2) + '</span></div>' +
+        (pos.sl ? '<div class="pos-item"><span class="pos-lbl">SL</span><span class="pos-val" style="color:#ff1744">' + fmt(pos.sym, pos.sl) + '</span></div>' : '<div class="pos-item"></div>') +
+        (pos.tp ? '<div class="pos-item"><span class="pos-lbl">TP</span><span class="pos-val" style="color:#00c853">' + fmt(pos.sym, pos.tp) + '</span></div>' : '<div class="pos-item"></div>') +
+        '<div class="pos-item"><span class="pos-lbl">TIME</span><span class="pos-val">' + pos.openAt + '</span></div>' +
+      '</div>' +
+      '<button class="close-btn" onclick="closeTrade(' + pos.id + ')">CLOSE POSITION</button>';
+
+    block.appendChild(card);
+  });
+
+  document.getElementById('posCount').textContent = '(' + account.positions.length + ')';
+}
+
+/* ══════════════════════════════════════════
+   TOAST
+══════════════════════════════════════════ */
+function showToast(msg, cls) {
+  var stack = document.getElementById('toastStack');
+  var el    = document.createElement('div');
+  el.className   = 'toast ' + (cls || '');
+  el.textContent = msg;
+  stack.appendChild(el);
+  setTimeout(function(){ if (el.parentNode) el.parentNode.removeChild(el); }, 2600);
+}
+
+/* ══════════════════════════════════════════
+   TICK LOOP — price simulation
+══════════════════════════════════════════ */
+function tickLoop() {
+  /* Update all symbol prices in background */
+  Object.keys(priceSim).forEach(function(sym) {
+    var meta = SYMBOLS[sym] || { spread:0.0001 };
+    var sim  = priceSim[sym];
+    var vol  = sim.price * 0.0002;
+    var d    = (Math.random() - 0.497) * vol;
+    sim.price = parseFloat((sim.price + d).toFixed(getPrecision(sym)));
+  });
+
+  /* Update active symbol display */
+  simulatePriceTick();
+}
+
+/* ══════════════════════════════════════════
+   BOOT
+══════════════════════════════════════════ */
+document.addEventListener('DOMContentLoaded', function() {
+  initSim();
+  buildWidget(currentSym);
+  simulatePriceTick();
+  setInterval(tickLoop, 900);
+});
+</script>
+<div class="bottom-nav">
+  <button onclick="window.location.href='dashboard.html'">Home</button>
+  <button onclick="window.location.href='challenges.html'">Challenges</button>
+  <button onclick="window.location.href='top traders.html'">Community</button>
+  <button onclick="window.location.href='chatroom.html'">Chat</button>
+</div>
+</body>
+</html>
